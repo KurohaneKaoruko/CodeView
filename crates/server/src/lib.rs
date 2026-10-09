@@ -1,7 +1,7 @@
 //! CodeView 服务端：axum HTTP API + 内嵌共享前端静态资源。
 //! 同时被 `codeview`（终端 Web 版）与 `codeview-desktop`（Tauri 壳）复用。
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use axum::body::Body;
 use axum::extract::{DefaultBodyLimit, Query, State};
 use axum::http::{header, HeaderValue, StatusCode, Uri};
@@ -738,6 +738,41 @@ fn collect_git(root: &Path) -> Option<String> {
     Some(out)
 }
 
+// ---------------- 系统文件管理器 ----------------
+
+/// 用操作系统自带的文件管理器打开目录（Windows 资源管理器 / macOS Finder / Linux 文件管理器）
+async fn api_open_native(Query(q): Query<HashMap<String, String>>) -> Response {
+    let path = q.get("path").cloned().unwrap_or_default();
+    if path.is_empty() {
+        return json_err("缺少 path 参数".into());
+    }
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return json_err(format!("路径不存在: {path}"));
+    }
+    let target = if p.is_dir() { p.clone() } else {
+        p.parent().map(|x| x.to_path_buf()).unwrap_or(p.clone())
+    };
+    let spawn = |program: &str, args: &[String]| -> Result<()> {
+        std::process::Command::new(program)
+            .args(args)
+            .spawn()
+            .with_context(|| format!("启动 {program} 失败"))?;
+        Ok(())
+    };
+    let r = if cfg!(windows) {
+        spawn("explorer.exe", &[target.to_string_lossy().to_string()])
+    } else if cfg!(target_os = "macos") {
+        spawn("open", &[target.to_string_lossy().to_string()])
+    } else {
+        spawn("xdg-open", &[target.to_string_lossy().to_string()])
+    };
+    match r {
+        Ok(()) => Json(json!({ "ok": true })).into_response(),
+        Err(e) => json_err(format!("{e:#}")),
+    }
+}
+
 // ---------------- 依赖分析 API ----------------
 
 async fn deps_graph(State(app): State<std::sync::Arc<App>>) -> Response {
@@ -783,6 +818,7 @@ fn router(app: std::sync::Arc<App>) -> Router {
         .route("/api/open", post(open_project))
         .route("/api/recent", get(recent))
         .route("/api/browse", get(browse))
+        .route("/api/open_native", get(api_open_native))
         .route("/api/tree", get(tree))
         .route("/api/file", get(get_file).put(put_file))
         .route("/api/file/delete", post(delete_file))

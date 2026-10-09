@@ -1,9 +1,10 @@
 //! CodeView 桌面版：Tauri 壳 + 内嵌本地 axum 服务。
 //! WebView 直接加载 http://127.0.0.1:<随机端口>/，与 Web 版共享同一套界面与 API。
+//! 窗口为无边框自绘（HTML 标题栏 + data-tauri-drag-region），任何构建都不弹终端。
 
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(windows, windows_subsystem = "windows")]
 
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 fn main() {
     let root = std::env::args()
@@ -14,6 +15,7 @@ fn main() {
         .unwrap_or_else(|| std::path::PathBuf::from("."));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             let root = root.clone();
             let (tx, rx) = std::sync::mpsc::channel::<u16>();
@@ -35,10 +37,14 @@ fn main() {
             let url: tauri::Url = format!("http://127.0.0.1:{port}/")
                 .parse()
                 .expect("解析 URL");
+            // 无边框窗口：标题栏、圆角边框由 HTML 侧自绘（见 assets/topbar）
             let win = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("CodeView")
                 .inner_size(1440.0, 920.0)
-                .min_inner_size(960.0, 600.0)
+                .min_inner_size(900.0, 560.0)
+                .decorations(false)
+                .shadow(true)
+                .resizable(true)
                 .build()?;
             let _ = win.set_focus();
             Ok(())

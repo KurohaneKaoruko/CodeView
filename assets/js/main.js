@@ -1,7 +1,7 @@
 // CodeView 前端入口
 import { api } from './api.js?v=3';
 import { el, icon, toast, errToast } from './ui.js?v=3';
-import { initPathDrop } from './pathdrop.js?v=3';
+import { initPathDrop, isDesktop } from './pathdrop.js?v=3';
 import { hideGraphTooltip } from './gitgraph.js?v=3';
 import * as files from './views/files.js?v=3';
 import * as editor from './views/editor.js?v=3';
@@ -152,6 +152,33 @@ document.getElementById('root-input').addEventListener('keydown', (e) => {
 initPathDrop(document.getElementById('root-input'), {
   onOpen: (p) => openProject(p),
 });
+
+// ---- 桌面端：无边框窗口的自绘标题栏（拖拽区 + 窗口按钮） ----
+function setupDesktopChrome() {
+  if (!isDesktop()) return;
+  document.body.classList.add('desktop');
+  const top = document.getElementById('topbar');
+  const win = window.__TAURI__.window.getCurrent();
+  // 拖拽区（品牌区与空白延伸区）
+  top.querySelector('.brand')?.setAttribute('data-tauri-drag-region', '');
+  top.querySelector('.spacer')?.setAttribute('data-tauri-drag-region', '');
+  const mk = (cls, label, fn) => el('button', {
+    class: `win-ctl ${cls}`,
+    title: label,
+    onclick: (e) => { e.stopPropagation(); fn(); },
+  }, label);
+  top.append(el('span', { class: 'win-ctls' },
+    mk('min', '最小化', () => win.minimize()),
+    mk('max', '最大化 / 还原', () => win.toggleMaximize()),
+    mk('close', '关闭', () => win.close()),
+  ));
+  // 双击拖拽区最大化/还原
+  top.addEventListener('dblclick', (e) => {
+    if (e.target.closest('button, input, select, textarea, .path-box, .win-ctl')) return;
+    win.toggleMaximize();
+  });
+}
+setupDesktopChrome();
 
 // ---- 状态栏 ----
 async function refreshStatusbar() {

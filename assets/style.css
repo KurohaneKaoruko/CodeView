@@ -50,6 +50,20 @@ body {
 
 svg.ic { flex: 0 0 auto; vertical-align: -2px; }
 
+/* ================= 桌面端无边框窗口 ================= */
+body.desktop { border: 1px solid var(--border-strong); }
+body.desktop #topbar { user-select: none; }
+.win-ctls { display: flex; align-items: center; gap: 2px; margin-left: 10px; }
+.win-ctl {
+  width: 40px; height: 30px; border: none; background: none; color: var(--fg-dim);
+  border-radius: 7px; cursor: pointer; font-size: 12.5px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s;
+}
+.win-ctl:hover { background: var(--hover); color: var(--fg); }
+.win-ctl.close:hover { background: #e81123; color: #fff; }
+.win-ctl.max { font-size: 14px; }
+
 /* ================= 标题栏 ================= */
 #topbar {
   display: flex; align-items: center; gap: 12px;

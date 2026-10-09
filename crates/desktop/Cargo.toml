@@ -9,6 +9,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
 tokio.workspace = true
 anyhow.workspace = true
 codeview-server = { path = "../server" }

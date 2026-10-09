@@ -1,6 +1,27 @@
 // 路径输入下拉面板：输入路径 / 最近打开 / 文件夹浏览三合一
 import { api } from './api.js?v=3';
-import { el, icon } from './ui.js?v=3';
+import { el, icon, toast, errToast } from './ui.js?v=3';
+
+// 是否运行在 Tauri 桌面端（暴露了全局 API）
+export const isDesktop = () => !!(window.__TAURI__ && window.__TAURI__.core);
+const currentWindow = () => (window.__TAURI__ && window.__TAURI__.window ? window.__TAURI__.window.getCurrent() : null);
+
+/** 原生目录选择对话框（仅桌面端可用）；返回路径或 null */
+async function nativePickDir() {
+  if (!isDesktop()) return null;
+  try {
+    const res = await window.__TAURI__.core.invoke('plugin:dialog|open', {
+      options: { directory: true, multiple: false, title: '选择项目目录' },
+    });
+    if (!res) return null;
+    if (typeof res === 'string') return res;
+    if (Array.isArray(res)) return res[0] && (res[0].path || res[0]);
+    return res.path || null;
+  } catch (e) {
+    errToast(e);
+    return null;
+  }
+}
 
 export function initPathDrop(input, { onOpen }) {
   let panel = null;
@@ -51,6 +72,25 @@ export function initPathDrop(input, { onOpen }) {
     panel.append(row({
       iconName: 'folder', label: '选择目录…（打开文件夹浏览器）', keep: true,
       onClick: async () => { mode = 'browse'; browseDir = ''; await renderBrowse(); },
+    }));
+    if (isDesktop()) {
+      panel.append(row({
+        iconName: 'disc', label: '用系统对话框选择目录…', keep: true,
+        onClick: async () => {
+          const p = await nativePickDir();
+          if (p) { close(); onOpen(p); }
+        },
+      }));
+    }
+    panel.append(row({
+      iconName: 'disc', label: '在系统文件管理器中显示当前项目', keep: true,
+      onClick: async () => {
+        const cur = document.getElementById('root-input').value;
+        if (!cur) return;
+        try {
+          await fetch('/api/open_native?path=' + encodeURIComponent(cur));
+        } catch (e) { errToast(e); }
+      },
     }));
     // 最近打开
     panel.append(el('div', { class: 'pd-section' }, '最近打开'));
