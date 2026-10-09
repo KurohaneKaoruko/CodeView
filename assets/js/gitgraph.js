@@ -289,24 +289,24 @@ export function createCommitGraph(container, { onNodeClick, onNodeMenu, mode = '
     const prev = hover;
     hover = hit ? hit.oid : null;
     if (hit) {
-      const tooltip = ensureTooltip();
-      tooltip.innerHTML = '';
-      tooltip.append(
+      const tip = ensureTooltip();
+      tip.innerHTML = '';
+      tip.append(
         el('div', { class: 't-subject' }, hit.subject || '(无信息)'),
         el('div', { class: 't-meta' },
           `${hit.author} · ${new Date(hit.time * 1000).toLocaleString()} · ${hit.oid.slice(0, 7)}`),
       );
-      tooltip.style.left = `${Math.min(e.clientX + 14, innerWidth - 440)}px`;
-      tooltip.style.top = `${e.clientY + 14}px`;
-      tooltip.style.display = '';
-    } else if (tooltip) {
-      tooltip.style.display = 'none';
+      tip.style.left = `${Math.min(e.clientX + 14, innerWidth - 440)}px`;
+      tip.style.top = `${e.clientY + 14}px`;
+      tip.style.display = '';
+    } else {
+      hideGraphTooltip();
     }
     if (prev !== hover) draw();
   });
   canvas.addEventListener('mouseleave', () => {
     hover = null;
-    if (tooltip) tooltip.style.display = 'none';
+    hideGraphTooltip();
     draw();
   });
 
