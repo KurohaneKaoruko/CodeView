@@ -164,15 +164,15 @@ function setupDesktopChrome() {
   // 拖拽区（品牌区与空白延伸区）
   top.querySelector('.brand')?.setAttribute('data-drag', '');
   top.querySelector('.spacer')?.setAttribute('data-drag', '');
-  const mk = (cls, label, fn) => el('button', {
+  const mk = (cls, iconName, label, fn) => el('button', {
     class: `win-ctl ${cls}`,
     title: label,
     onclick: (e) => { e.stopPropagation(); fn(); },
-  }, label);
+  }, icon(iconName, 14));
   top.append(el('span', { class: 'win-ctls' },
-    mk('min', '最小化', () => winAction('minimize')),
-    mk('max', '最大化 / 还原', () => winAction('maximize')),
-    mk('close', '关闭', () => winAction('close')),
+    mk('min', 'win-min', '最小化', () => winAction('minimize')),
+    mk('max', 'win-max', '最大化 / 还原', () => winAction('maximize')),
+    mk('close', 'win-close', '关闭', () => winAction('close')),
   ));
   // 按住拖拽区 → 后端进入窗口拖拽循环
   top.addEventListener('mousedown', (e) => {
