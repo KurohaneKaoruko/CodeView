@@ -141,16 +141,12 @@ export function render(host) {
     const baseUrl = el('input', { type: 'text', placeholder: 'https://api.openai.com/v1', style: { width: '100%' }, spellcheck: 'false' });
     const model = el('input', { type: 'text', placeholder: '模型名，如 gpt-4o-mini', style: { width: '100%' }, spellcheck: 'false' });
     const apiKey = el('input', { type: 'password', placeholder: 'API Key（留空不修改）', style: { width: '100%' }, spellcheck: 'false' });
-    api.aiConfig().then((c) => {
-      baseUrl.value = c.base_url || '';
-      model.value = c.model || '';
-      statusEl.textContent = c.has_key ? '密钥已设置' : '未配置密钥';
-    }).catch(() => {});
-    return el('div', { class: 'ai-block' },
-      el('div', { class: 'sec-title' }, icon('edit', 12), '接口配置', el('span', { style: { flex: 1 } }), statusEl),
-      baseUrl, model, apiKey,
+    let loaded = false;
+    const body = el('div', {
+      style: { display: 'none', flexDirection: 'column', gap: '7px' },
+    }, baseUrl, model, apiKey,
       el('button', {
-        class: 'btn mini primary', style: { marginTop: '6px', alignSelf: 'flex-start' },
+        class: 'btn mini primary', style: { marginTop: '4px', alignSelf: 'flex-start' },
         onclick: async () => {
           try {
             const r = await api.aiSetConfig({ base_url: baseUrl.value, model: model.value, api_key: apiKey.value });
@@ -160,6 +156,27 @@ export function render(host) {
         },
       }, '保存配置'),
     );
+    const caret = el('span', { style: { display: 'inline-flex', transition: 'transform .12s', color: 'var(--fg-faint)' } }, icon('chev-down', 10));
+    const head = el('div', {
+      class: 'sec-title', style: { cursor: 'pointer' },
+      onclick: () => {
+        open = !open;
+        body.style.display = open ? 'flex' : 'none';
+        caret.style.transform = open ? 'rotate(180deg)' : '';
+        if (open && !loaded) {
+          loaded = true;
+          api.aiConfig().then((c) => {
+            baseUrl.value = c.base_url || '';
+            model.value = c.model || '';
+            statusEl.textContent = c.has_key ? '密钥已设置' : '未配置密钥';
+          }).catch(() => {});
+        }
+      },
+    },
+      icon('sliders', 12), '接口配置', el('span', { style: { flex: 1 } }), statusEl, caret,
+    );
+    let open = false;
+    return el('div', { class: 'ai-block' }, head, body);
   }
 }
 
