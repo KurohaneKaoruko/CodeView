@@ -384,6 +384,47 @@ pre.codeview .line-hl {
   padding: 8px 10px; font: 11.5px/1.5 var(--mono); white-space: pre-wrap; color: #9da5b4; overflow-x: auto;
 }
 
+/* ================= AI 分析（独立视图） ================= */
+.ai-view { flex-direction: column; }
+.ai-body { flex: 1; display: flex; min-height: 0; }
+.ai-side {
+  flex: 0 0 330px; border-right: 1px solid var(--border); background: var(--sidebar);
+  overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 14px;
+}
+.ai-side .ai-block { display: flex; flex-direction: column; gap: 7px; }
+.ai-side .sec-title { margin: 0; gap: 8px; }
+.ai-side .sec-title > span[style] { flex: 1; }
+.ai-main { flex: 1; min-width: 0; overflow: auto; padding: 16px 20px; }
+.ai-stream { display: flex; flex-direction: column; gap: 10px; max-width: 900px; }
+.ai-q {
+  align-self: flex-end; max-width: 78%;
+  background: var(--accent-soft); border: 1px solid rgba(91, 140, 255, .35);
+  border-radius: 12px 12px 3px 12px; padding: 8px 12px; font-size: 12.5px; white-space: pre-wrap; user-select: text;
+}
+.ai-q .who { display: none; }
+.ai-a {
+  max-width: 100%; display: flex; gap: 10px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 3px 12px 12px 12px;
+  padding: 10px 14px;
+}
+.ai-a .who {
+  flex: 0 0 auto; width: 20px; height: 20px; border-radius: 6px;
+  background: linear-gradient(135deg, #5b8cff, #bc8cff); color: #fff;
+  font: 10px/20px var(--sans); font-weight: 700; text-align: center; margin-top: 2px;
+}
+.ai-a .err-text { color: var(--red); word-break: break-all; font-size: 12px; }
+.ai-answer .md, .ai-a .md { font-size: 12.5px; line-height: 1.75; color: var(--fg-dim); user-select: text; }
+.ai-answer .md .md-h, .ai-a .md .md-h { color: var(--fg); font-weight: 650; margin: 10px 0 4px; }
+.ai-a .md .md-p { margin: 4px 0; }
+.ai-a .md .md-li { display: flex; gap: 6px; margin: 2px 0; }
+.ai-a .md .bul { color: var(--accent); flex: 0 0 auto; }
+.ai-a .md b { color: var(--fg); }
+.ai-a .md code { background: var(--raised); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font: 11.5px var(--mono); color: var(--cyan); }
+.ai-a .md .md-code {
+  background: #0d0f13; border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 10px; font: 11.5px/1.5 var(--mono); white-space: pre-wrap; color: #9da5b4; overflow-x: auto;
+}
+
 /* ================= Git 管理（历史+工作区合并） ================= */
 .mgmt-wrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .mgmt-main { flex: 1; display: flex; min-height: 0; position: relative; }

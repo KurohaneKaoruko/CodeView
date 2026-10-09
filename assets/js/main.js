@@ -8,7 +8,7 @@ import * as git from './views/gitmgmt.js?v=3';
 import * as compare from './views/compare.js?v=3';
 import * as deps from './views/deps.js?v=3';
 import * as searchPanel from './views/searchpanel.js?v=3';
-import * as aiPanel from './views/ai.js?v=3';
+import * as ai from './views/ai.js?v=3';
 
 const S = { overview: null, view: 'files', sidePanel: 'files' };
 
@@ -111,19 +111,19 @@ function switchView(view, force = false) {
     content.append(holder);
     if (view === 'git') git.render(holder);
     else if (view === 'compare') compare.render(holder);
+    else if (view === 'ai') ai.render(holder);
     else if (view === 'deps') deps.render(holder);
   }
   syncActivity();
 }
 
-// ---- 侧栏面板（资源管理器 / 搜索 / AI 分析） ----
+// ---- 侧栏面板（仅编辑器视图：资源管理器 / 搜索） ----
 function renderSidebar() {
   side.innerHTML = '';
   S.renderedPanel = S.sidePanel;
   const host = el('div', { class: 'side-host' });
   side.append(host);
   if (S.sidePanel === 'search') searchPanel.render(host, { focus: true });
-  else if (S.sidePanel === 'ai') aiPanel.render(host);
   else files.render(host);
 }
 
