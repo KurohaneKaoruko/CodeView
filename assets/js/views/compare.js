@@ -23,16 +23,59 @@ export function render(content) {
   window.__cmpPrefill = null;
 
   // ---- 工具栏 ----
-  const datalist = el('datalist', { id: 'cmp-refs' });
+  // 引用选择：自绘下拉建议（本地/远程分支、标签、HEAD），不再使用原生 datalist
+  let refItems = [];
   api.gitRefs().then((refs) => {
-    for (const b of refs.locals) datalist.append(el('option', { value: b.name }, `本地分支${b.is_head ? '（当前）' : ''}`));
-    for (const b of refs.remote_branches) datalist.append(el('option', { value: b.name }, '远程分支'));
-    for (const t of refs.tags) datalist.append(el('option', { value: t.name }, '标签'));
-    datalist.append(el('option', { value: 'HEAD' }, '当前 HEAD'));
+    refItems = [
+      ...refs.locals.map((b) => ({ value: b.name, kind: b.is_head ? '本地分支 ✓' : '本地分支' })),
+      ...refs.remote_branches.map((b) => ({ value: b.name, kind: '远程分支' })),
+      ...refs.tags.map((t) => ({ value: t.name, kind: '标签' })),
+      { value: 'HEAD', kind: '当前 HEAD' },
+    ];
+    refreshDropA && refreshDropA();
+    refreshDropB && refreshDropB();
+    if (prefill.a || prefill.b) doCompare();
   }).catch(() => {});
 
-  const inputA = el('input', { type: 'text', list: 'cmp-refs', value: prefill.a || '', placeholder: 'A：分支 / 标签 / commit id', spellcheck: 'false', style: { width: '220px', fontFamily: 'var(--mono)' } });
-  const inputB = el('input', { type: 'text', list: 'cmp-refs', value: prefill.b || '', placeholder: 'B：分支 / 标签 / commit id', spellcheck: 'false', style: { width: '220px', fontFamily: 'var(--mono)' } });
+  function makeRefCombo(placeholder, initial) {
+    const wrap = el('div', { class: 'ref-combo' });
+    const input = el('input', { type: 'text', value: initial || '', placeholder, spellcheck: 'false', style: { width: '220px', fontFamily: 'var(--mono)' } });
+    const drop = el('div', { class: 'ref-drop', style: { display: 'none' } });
+    wrap.append(input, drop);
+    let refreshDrop = () => {};
+    const renderDrop = () => {
+      const q = input.value.trim().toLowerCase();
+      const items = refItems.filter((r) => !q || r.value.toLowerCase().includes(q));
+      drop.innerHTML = '';
+      if (!items.length) { drop.append(el('div', { class: 'ref-empty' }, '无匹配引用')); return; }
+      for (const it of items.slice(0, 200)) {
+        drop.append(el('div', { class: 'ref-item', onclick: () => { input.value = it.value; drop.style.display = 'none'; doCompare(); } },
+          el('span', { class: 'mono' }, it.value),
+          el('span', { class: 'dim' }, it.kind),
+        ));
+      }
+    };
+    refreshDrop = renderDrop;
+    const openDrop = () => { renderDrop(); drop.style.display = ''; };
+    input.addEventListener('focus', openDrop);
+    input.addEventListener('click', openDrop);
+    input.addEventListener('input', renderDrop);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { drop.style.display = 'none'; doCompare(); }
+      if (e.key === 'Escape') drop.style.display = 'none';
+    });
+    setTimeout(() => document.addEventListener('mousedown', (e) => {
+      if (!wrap.contains(e.target)) drop.style.display = 'none';
+    }, true), 0);
+    return { input, refreshDrop };
+  }
+
+  const comboA = makeRefCombo('A：分支 / 标签 / commit id', prefill.a || '');
+  const inputA = comboA.input;
+  const comboB = makeRefCombo('B：分支 / 标签 / commit id', prefill.b || '');
+  const inputB = comboB.input;
+  const refreshDropA = () => comboA.refreshDrop();
+  const refreshDropB = () => comboB.refreshDrop();
   const mbCheck = el('input', { type: 'checkbox' });
   mbCheck.checked = false;
   const statsSpan = el('span', { class: 'muted', style: { fontSize: '11.5px' } });

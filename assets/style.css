@@ -43,12 +43,50 @@ body {
   overflow: hidden;
   user-select: none;
 }
-::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #333947; border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: #454c5c; border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-corner { background: transparent; }
 
+/* ---- 引用选择下拉（对比视图等） ---- */
+.ref-combo { position: relative; }
+.ref-drop {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 80;
+  background: var(--raised); border: 1px solid var(--border-strong); border-radius: 8px;
+  box-shadow: var(--shadow); max-height: 300px; overflow-y: auto;
+}
+.ref-drop::-webkit-scrollbar { width: 8px; }
+.ref-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px; cursor: pointer; font-size: 12px; color: var(--fg-dim);
+}
+.ref-item:hover { background: var(--active); color: var(--fg); }
+.ref-item .dim { margin-left: auto; color: var(--fg-faint); font-size: 10.5px; }
+.ref-empty { padding: 8px 12px; color: var(--fg-faint); font-size: 11.5px; }
+
 svg.ic { flex: 0 0 auto; vertical-align: -2px; }
+
+/* ---- 自绘下拉选择 ---- */
+.dd { position: relative; display: inline-block; }
+.dd-btn {
+  display: inline-flex; align-items: center; gap: 8px; width: 100%;
+  background: var(--editor-bg); color: var(--fg);
+  border: 1px solid var(--border-strong); border-radius: var(--r);
+  padding: 5px 10px; font: 12.5px var(--sans); cursor: pointer;
+  transition: border-color .15s;
+}
+.dd-btn:hover { border-color: var(--accent); }
+.dd-btn .dd-val { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-btn svg:last-child { flex: 0 0 auto; color: var(--fg-dim); }
+.dd-list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 95;
+  background: var(--raised); border: 1px solid var(--border-strong); border-radius: 8px;
+  box-shadow: var(--shadow); max-height: 300px; overflow-y: auto; min-width: 160px;
+}
+.dd-item { padding: 5px 11px; cursor: pointer; font-size: 12px; color: var(--fg-dim); }
+.dd-item:hover { background: var(--active); color: var(--fg); }
+.dd-item.sel { color: var(--accent); }
+.dd-field { width: 100%; }
 
 /* ================= 桌面端无边框窗口 ================= */
 body.desktop { border: 1px solid var(--border-strong); }

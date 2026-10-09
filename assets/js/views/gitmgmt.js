@@ -2,7 +2,7 @@
 import { api } from '../api.js?v=3';
 import {
   el, icon, contextMenu, popoverInput, confirmDlg, formModal, toast, errToast,
-  fmtTime, shortOid, avatar, renderDiffRows,
+  fmtTime, shortOid, avatar, renderDiffRows, dropdown,
 } from '../ui.js?v=3';
 import { layoutGraph } from '../gitlanes.js?v=3';
 import { createCommitGraph, hideGraphTooltip } from '../gitgraph.js?v=3';
@@ -37,7 +37,17 @@ export function render(content) {
   const modeLabel = (m) => ({ merge: 'merge 合并', rebase: 'rebase 变基', 'ff-only': 'ff-only 仅快进' }[m] || m);
 
   // ---------------- 工具栏 ----------------
-  const branchSel = el('select', { style: { maxWidth: '170px' }, onchange: () => { state.ref = branchSel.value; state.limit = 600; refreshLog(); } });
+  const branchItems = (refs) => {
+    const items = [{ value: '', label: '全部分支' }];
+    for (const b of (refs ? refs.locals : [])) items.push({ value: b.name, label: (b.is_head ? '✓ ' : '') + b.name });
+    for (const t of (refs ? refs.tags : [])) items.push({ value: `refs/tags/${t.name}`, label: `🏷 ${t.name}` });
+    return items;
+  };
+  const branchDd = dropdown({
+    items: [], value: state.ref, placeholder: '全部分支', width: '180px',
+    onChange: (v) => { state.ref = v; state.limit = 600; refreshLog(); },
+  });
+  api.gitRefs().then((refs) => branchDd.setItems(branchItems(refs))).catch(() => {});
   const search = el('input', {
     type: 'text', placeholder: '搜索提交 / 作者 / hash', style: { width: '200px' },
     oninput: () => highlightSearch(),
@@ -57,7 +67,7 @@ export function render(content) {
     el('span', { class: 'sep' }),
     el('span', { class: 'vtitle' }, icon('branch', 15), 'Git 管理'),
     el('span', { class: 'sep' }),
-    icon('branch', 12), branchSel,
+    icon('branch', 12), branchDd.el,
     search,
     el('span', { class: 'sep' }),
     el('button', { class: 'btn ghost mini', title: '从远程拉取（不合并）', onclick: () => runQuick({ op: 'fetch', remote: 'origin', prune: true }, 'Fetch') }, icon('arrow-down', 12), 'Fetch'),
@@ -146,12 +156,7 @@ export function render(content) {
   }
 
   // ---------------- 数据加载 ----------------
-  api.gitRefs().then((refs) => {
-    branchSel.innerHTML = '';
-    branchSel.append(el('option', { value: '', selected: state.ref === '' }, '全部分支'));
-    for (const b of refs.locals) branchSel.append(el('option', { value: b.name, selected: state.ref === b.name }, `${b.is_head ? '✓ ' : ''}${b.name}`));
-    for (const t of refs.tags) branchSel.append(el('option', { value: `refs/tags/${t.name}` }, `🏷 ${t.name}`));
-  }).catch(() => {});
+  api.gitRefs().then((refs) => branchDd.setItems(branchItems(refs))).catch(() => {});
 
   refreshLog();
   refreshWork();
@@ -477,19 +482,26 @@ export function render(content) {
   }
 
   // ---------------- 大型视图：提交信息弹窗 ----------------
+  let activePopupEl = null;
+  function closeActivePopup() {
+    if (activePopupEl) {
+      activePopupEl.remove();
+      activePopupEl = null;
+    }
+  }
   function showCommitPopup(row, x, y) {
-    closePopup();
-    let pop = null;
+    closeActivePopup();
     const body = el('div', { class: 'popup-b' });
-    pop = el('div', { class: 'commit-popup' },
+    const pop = el('div', { class: 'commit-popup' },
       el('div', { class: 'card-h' },
         icon('commit', 13),
         el('span', { style: { textTransform: 'none', letterSpacing: 0, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
           row.subject || '(无信息)'),
         el('span', { style: { flex: 1 } }),
-        el('button', { class: 'icon-btn', onclick: closePopup }, icon('x', 12))),
+        el('button', { class: 'icon-btn', onclick: closeActivePopup }, icon('x', 12))),
       body,
     );
+    activePopupEl = pop;
     body.append(el('div', { class: 'empty-hint' }, el('span', { class: 'spin' }, '⠋'), ' 加载…'));
     document.body.append(pop);
     const pw = 460;
@@ -497,19 +509,12 @@ export function render(content) {
     pop.style.left = `${Math.max(8, Math.min(x - pw / 2, innerWidth - pw - 8))}px`;
     pop.style.top = `${Math.min(y + 16, Math.max(8, innerHeight - 420))}px`;
 
-    const outside = (e) => { if (pop && !pop.contains(e.target)) closePopup(); };
-    const onKey = (e) => { if (e.key === 'Escape') closePopup(); };
+    const outside = (e) => { if (activePopupEl && !activePopupEl.contains(e.target)) closeActivePopup(); };
+    const onKey = (e) => { if (e.key === 'Escape') closeActivePopup(); };
     setTimeout(() => {
       document.addEventListener('mousedown', outside, true);
       document.addEventListener('keydown', onKey);
     }, 0);
-    function closePopup() {
-      if (!pop) return;
-      pop.remove();
-      pop = null;
-      document.removeEventListener('mousedown', outside, true);
-      document.removeEventListener('keydown', onKey);
-    }
 
     const renderList = (d) => {
       body.innerHTML = '';

@@ -104,8 +104,18 @@ export function formModal({ title, icon: iconName, fields = [], okText = '确定
         if (f.label && f.type !== 'checkbox') field.append(el('label', {}, f.label));
         let input;
         if (f.type === 'select') {
-          input = el('select', {},
-            (f.options || []).map((o) => el('option', { value: o.value ?? o, selected: (o.value ?? o) === f.value }, o.label ?? o)));
+          // 自绘下拉（深色、样式统一），替代原生 select
+          const comp = dropdown({
+            items: (f.options || []).map((o) => (typeof o === 'object' ? o : { value: o, label: o })),
+            value: f.value || '',
+            placeholder: f.placeholder || '请选择…',
+          });
+          input = comp.el;
+          input.classList.add('dd-field');
+          inputs[f.key] = comp;
+          values[f.key] = () => comp.get();
+          field.append(input);
+          return field;
         } else if (f.type === 'textarea') {
           input = el('textarea', { rows: f.rows || 3 }, f.value || '');
         } else if (f.type === 'checkbox') {
@@ -252,6 +262,48 @@ export function avatar(name, size = 20) {
   const d = el('div', { class: 'avatar', title: name, style: { width: `${size}px`, height: `${size}px`, background: avatarColor(name) } },
     (name || '?').trim().charAt(0).toUpperCase());
   return d;
+}
+
+// ---- 自绘下拉选择（替代原生 select，深色可定制） ----
+// items: [{value, label}] 或 [字符串]；返回 { el, get, set, setItems }
+export function dropdown({ items = [], value = '', placeholder = '请选择…', width = '', onChange } = {}) {
+  let list = null;
+  let valSpan = null;
+  const wrap = el('div', { class: 'dd', style: width ? { width } : {} });
+  const btn = el('button', { type: 'button', class: 'dd-btn' },
+    el('span', { class: 'dd-val' }, value || placeholder),
+    icon('chev-down', 11),
+  );
+  const close = () => { if (list) { list.remove(); list = null; } document.removeEventListener('mousedown', out, true); };
+  const out = (e) => { if (!wrap.contains(e.target)) close(); };
+  const open = () => {
+    if (list) { close(); return; }
+    list = el('div', { class: 'dd-list' });
+    if (!items.length) list.append(el('div', { class: 'ref-empty' }, '（无）'));
+    for (const it of items) {
+      const v = it.value ?? it;
+      const label = it.label ?? v;
+      list.append(el('div', {
+        class: `dd-item${v === value ? ' sel' : ''}`,
+        onclick: () => {
+          value = v;
+          valSpan.textContent = value || placeholder;
+          close();
+          onChange && onChange(value);
+        },
+      }, el('span', {}, label)));
+    }
+    wrap.append(list);
+    document.addEventListener('mousedown', out, true);
+  };
+  btn.addEventListener('click', open);
+  wrap.append(btn);
+  return {
+    el: wrap,
+    get: () => value,
+    set: (v) => { value = v; valSpan.textContent = v || placeholder; },
+    setItems: (newItems) => { items = newItems; },
+  };
 }
 
 // ---- 带行号的 diff 渲染 ----
