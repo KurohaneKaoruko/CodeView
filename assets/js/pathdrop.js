@@ -52,7 +52,7 @@ export function initPathDrop(input, { onOpen }) {
       }));
     }
     panel.append(row({
-      iconName: 'folder', label: '选择目录…（系统文件管理器）', keep: true,
+      iconName: 'folder', label: '选择目录（系统文件管理器）…', keep: true,
       onClick: async () => {
         try {
           const r = await api.pickDir();
