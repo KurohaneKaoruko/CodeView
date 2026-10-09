@@ -4,6 +4,7 @@ import { el, icon, toast, errToast } from '../ui.js';
 
 export function render(host) {
   host.innerHTML = '';
+  host.append(el('div', { class: 'side-head' }, icon('sparkles', 13), 'AI 分析'));
 
   // ---- 配置区（默认折叠）----
   const cfgBox = el('div', { class: 'ai-cfg', style: { display: 'none' } });

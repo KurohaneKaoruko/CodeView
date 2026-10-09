@@ -1,25 +1,40 @@
 // CodeView 前端入口
-import { api } from './api.js';
-import { el, icon, toast, errToast } from './ui.js';
-import { initPathDrop } from './pathdrop.js';
-import * as files from './views/files.js';
-import * as editor from './views/editor.js';
-import * as git from './views/gitmgmt.js';
-import * as compare from './views/compare.js';
-import * as deps from './views/deps.js';
-import * as searchPanel from './views/searchpanel.js';
-import * as aiPanel from './views/ai.js';
+import { api } from './api.js?v=3';
+import { el, icon, toast, errToast } from './ui.js?v=3';
+import { initPathDrop } from './pathdrop.js?v=3';
+import * as files from './views/files.js?v=3';
+import * as editor from './views/editor.js?v=3';
+import * as git from './views/gitmgmt.js?v=3';
+import * as compare from './views/compare.js?v=3';
+import * as deps from './views/deps.js?v=3';
+import * as searchPanel from './views/searchpanel.js?v=3';
+import * as aiPanel from './views/ai.js?v=3';
 
-const S = { overview: null, view: 'files', sideTab: 'files' };
+const S = { overview: null, view: 'files', sidePanel: 'files' };
 
 const side = document.getElementById('side');
 const content = document.getElementById('content');
 
-// 活动栏图标
-const ACT_ICONS = { files: 'code', git: 'branch', compare: 'compare', deps: 'package' };
+// 活动栏图标：左列每个图标 = 一个视图 或 一个侧栏面板
+const ACT_ICONS = { files: 'code', search: 'search', ai: 'sparkles', git: 'branch', compare: 'compare', deps: 'package' };
+function syncActivity() {
+  document.querySelectorAll('.act-btn').forEach((x) => {
+    const onPanel = x.dataset.panel && x.dataset.panel === S.sidePanel && S.view === 'files';
+    const onView = x.dataset.view && x.dataset.view === S.view;
+    x.classList.toggle('active', !!(onPanel || onView));
+  });
+}
 document.querySelectorAll('.act-btn').forEach((b) => {
-  b.append(icon(ACT_ICONS[b.dataset.view], 20));
-  b.addEventListener('click', () => switchView(b.dataset.view, true));
+  b.append(icon(ACT_ICONS[b.dataset.panel || b.dataset.view], 20));
+  b.addEventListener('click', () => {
+    if (b.dataset.panel) {
+      // 面板图标：切换侧栏面板并回到编辑器视图
+      S.sidePanel = b.dataset.panel;
+      switchView('files', true);
+    } else {
+      switchView(b.dataset.view, true);
+    }
+  });
 });
 
 // 编辑器容器常驻（切换视图时隐藏/显示以保留状态）
@@ -71,62 +86,44 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (S.view === 'files') editor.cycleTab(1);
   }
+  // Ctrl+Shift+F 聚焦侧栏搜索
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+    e.preventDefault();
+    const input = document.getElementById('side-search-input');
+    if (input) { input.focus(); input.select(); }
+  }
 });
 
 // ---- 视图切换（force：手动点击时即使同视图也重绘） ----
+// 侧栏面板由活动栏图标切换（资源/搜索/AI），在所有视图常驻
 function switchView(view, force = false) {
-  const same = S.view === view;
   S.view = view;
-  document.querySelectorAll('.act-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   content.querySelectorAll('.view').forEach((v) => v.remove());
   if (view === 'files') {
     setActiveEditor(true);
-    side.classList.add('visible');
-    if (force || !same || !side.children.length) renderSidebar();
-    return;
+    if (force || S.sidePanel !== S.renderedPanel) renderSidebar();
+  } else {
+    setActiveEditor(false);
+    const holder = el('div', { class: 'view' });
+    content.append(holder);
+    if (view === 'git') git.render(holder);
+    else if (view === 'compare') compare.render(holder);
+    else if (view === 'deps') deps.render(holder);
+    if (!side.children.length) renderSidebar();
   }
-  setActiveEditor(false);
-  side.classList.remove('visible');
-  side.innerHTML = '';
-  const holder = el('div', { class: 'view' });
-  content.append(holder);
-  if (view === 'git') git.render(holder);
-  else if (view === 'compare') compare.render(holder);
-  else if (view === 'deps') deps.render(holder);
+  syncActivity();
 }
 
-// ---- 侧栏：竖向堆叠 —— 资源管理器 / 搜索 / AI 分析（顺序固定，AI 在最后） ----
-const SIDE_SEC = { files: true, search: true, ai: true };
+// ---- 侧栏面板（资源管理器 / 搜索 / AI 分析） ----
 function renderSidebar() {
   side.innerHTML = '';
-  const section = (key, title, iconName, actions, grow) => {
-    const open = SIDE_SEC[key];
-    const head = el('div', { class: 'side-sec-head' },
-      el('span', { class: `caret${open ? ' open' : ''}` }, icon('chev-right', 10)),
-      icon(iconName, 12),
-      el('span', { class: 't' }, title),
-      el('span', { style: { flex: 1 } }),
-      ...(actions || []),
-    );
-    head.addEventListener('click', (e) => {
-      if (e.target.closest('button')) return;
-      SIDE_SEC[key] = !SIDE_SEC[key];
-      renderSidebar();
-    });
-    const body = el('div', {
-      class: 'side-sec-body',
-      style: { display: open ? '' : 'none', flex: grow === true ? '1 1 auto' : `0 0 ${grow}px` },
-    });
-    side.append(el('div', {
-      class: 'side-sec',
-      style: { flex: grow === true ? '1 1 auto' : '0 0 auto', minHeight: grow === true ? '150px' : '0' },
-    }, head, body));
-    return body;
-  };
-
-  files.render(section('files', '资源管理器', 'code', files.actions(), true));
-  searchPanel.render(section('search', '搜索', 'search', [], 200));
-  aiPanel.render(section('ai', 'AI 分析', 'sparkles', [], 240));
+  side.classList.add('visible');
+  S.renderedPanel = S.sidePanel;
+  const host = el('div', { class: 'side-host' });
+  side.append(host);
+  if (S.sidePanel === 'search') searchPanel.render(host, { focus: true });
+  else if (S.sidePanel === 'ai') aiPanel.render(host);
+  else files.render(host);
 }
 
 // ---- 打开项目 ----

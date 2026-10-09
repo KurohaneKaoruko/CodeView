@@ -44,6 +44,8 @@ export function actions() {
 
 export function render(host) {
   host.innerHTML = '';
+  host.append(el('div', { class: 'side-head' }, '资源管理器',
+    el('span', { class: 'btns' }, ...actions())));
   const root = el('div', {});
   host.append(root);
   loadChildren('', root, 0);

@@ -4,7 +4,7 @@ import { el, icon, toast, errToast } from '../ui.js';
 
 export function render(host, opts = {}) {
   host.innerHTML = '';
-  const input = el('input', { type: 'text', placeholder: '搜索项目内容…', spellcheck: 'false', style: { width: '100%' } });
+  const input = el('input', { type: 'text', id: 'side-search-input', placeholder: '搜索项目内容…', spellcheck: 'false', style: { width: '100%' } });
   const cs = el('input', { type: 'checkbox' });
   const rx = el('input', { type: 'checkbox' });
   const results = el('div', { class: 'search-results' });
@@ -51,6 +51,7 @@ export function render(host, opts = {}) {
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
 
   host.append(
+    el('div', { class: 'side-head' }, icon('search', 13), '搜索'),
     el('div', { style: { padding: '10px' } },
       el('div', { style: { display: 'flex', gap: '6px' } },
         input,

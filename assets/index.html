@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CodeView</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <header id="topbar">
@@ -21,7 +21,10 @@
 
 <div id="main">
   <nav id="activity">
-    <button class="act-btn active" data-view="files" title="资源管理器"></button>
+    <button class="act-btn active" data-view="files" data-panel="files" title="资源管理器"></button>
+    <button class="act-btn" data-panel="search" title="搜索"></button>
+    <button class="act-btn" data-panel="ai" title="AI 分析"></button>
+    <div class="act-sep"></div>
     <button class="act-btn" data-view="git" title="Git 管理"></button>
     <button class="act-btn" data-view="compare" title="提交对比"></button>
     <button class="act-btn" data-view="deps" title="依赖图谱"></button>
