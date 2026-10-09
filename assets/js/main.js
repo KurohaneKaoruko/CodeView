@@ -234,7 +234,7 @@ async function boot() {
   document.getElementById('root-input').value = S.overview.root;
   document.getElementById('sb-root').textContent = S.overview.root;
   document.getElementById('sb-root').title = S.overview.root;
-  document.getElementById('proj-name').textContent = ` — ${S.overview.name}`;
+  document.getElementById('proj-name').textContent = S.overview.name;
   document.getElementById('sb-hint').textContent = 'Ctrl+S 保存 · Ctrl+Tab 切换标签';
   document.title = `CodeView — ${S.overview.name}`;
   // 项目切换：清空各视图残留状态
