@@ -43,23 +43,27 @@ export function render(content) {
     const drop = el('div', { class: 'ref-drop', style: { display: 'none' } });
     wrap.append(input, drop);
     let refreshDrop = () => {};
+    let query = ''; // 仅在输入时过滤；打开下拉总是显示全部
     const renderDrop = () => {
-      const q = input.value.trim().toLowerCase();
+      const q = query.trim().toLowerCase();
       const items = refItems.filter((r) => !q || r.value.toLowerCase().includes(q));
       drop.innerHTML = '';
       if (!items.length) { drop.append(el('div', { class: 'ref-empty' }, '无匹配引用')); return; }
       for (const it of items.slice(0, 200)) {
-        drop.append(el('div', { class: 'ref-item', onclick: () => { input.value = it.value; drop.style.display = 'none'; doCompare(); } },
+        drop.append(el('div', {
+          class: `ref-item${it.value === input.value ? ' sel' : ''}`,
+          onclick: () => { input.value = it.value; drop.style.display = 'none'; doCompare(); },
+        },
           el('span', { class: 'mono' }, it.value),
           el('span', { class: 'dim' }, it.kind),
         ));
       }
     };
     refreshDrop = renderDrop;
-    const openDrop = () => { renderDrop(); drop.style.display = ''; };
+    const openDrop = () => { query = ''; renderDrop(); drop.style.display = ''; };
     input.addEventListener('focus', openDrop);
     input.addEventListener('click', openDrop);
-    input.addEventListener('input', renderDrop);
+    input.addEventListener('input', () => { query = input.value; renderDrop(); });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { drop.style.display = 'none'; doCompare(); }
       if (e.key === 'Escape') drop.style.display = 'none';
