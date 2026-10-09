@@ -1,6 +1,6 @@
 // 侧栏 · 搜索：全局文本搜索（子串 / 正则，可选大小写敏感）
-import { api } from '../api.js';
-import { el, icon, toast, errToast } from '../ui.js';
+import { api } from '../api.js?v=3';
+import { el, icon, toast, errToast } from '../ui.js?v=3';
 
 export function render(host, opts = {}) {
   host.innerHTML = '';

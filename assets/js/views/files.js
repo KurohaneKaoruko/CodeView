@@ -1,6 +1,6 @@
 // 资源管理器：文件树 + git 状态着色 + 右键操作
-import { api } from '../api.js';
-import { el, icon, contextMenu, formModal, confirmDlg, toast, errToast, extColor } from '../ui.js';
+import { api } from '../api.js?v=3';
+import { el, icon, contextMenu, formModal, confirmDlg, toast, errToast, extColor } from '../ui.js?v=3';
 
 const state = {
   expanded: new Set(),

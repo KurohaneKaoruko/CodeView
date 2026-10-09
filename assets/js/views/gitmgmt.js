@@ -1,11 +1,11 @@
 // Git 管理：树状提交图（滚动） + 工作区操作 同屏；抽屉式详情；横向大型自由视图
-import { api } from '../api.js';
+import { api } from '../api.js?v=3';
 import {
   el, icon, contextMenu, popoverInput, confirmDlg, formModal, toast, errToast,
   fmtTime, shortOid, avatar, renderDiffRows,
-} from '../ui.js';
-import { layoutGraph } from '../gitlanes.js';
-import { createCommitGraph } from '../gitgraph.js';
+} from '../ui.js?v=3';
+import { layoutGraph } from '../gitlanes.js?v=3';
+import { createCommitGraph, hideGraphTooltip } from '../gitgraph.js?v=3';
 
 const state = {
   // 历史

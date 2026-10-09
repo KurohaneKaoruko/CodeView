@@ -1,8 +1,8 @@
 // Canvas 提交树状图，两种模式：
 //  - 'scroll'（默认）：VS Code 风格，图表随内容固定绘制，原生滚动条/滚轮查看
 //  - 'free'：全宽自由视图，支持缩放（滚轮）与平移（拖拽）
-import { el } from './ui.js';
-import { LANE_W, ROW_H, X0, Y0, laneColor } from './gitlanes.js';
+import { el } from './ui.js?v=3';
+import { LANE_W, ROW_H, X0, Y0, laneColor } from './gitlanes.js?v=3';
 
 const NODE_R = 5.5;
 const MAX_CANVAS_H = 30000; // scroll 模式画布高度上限
@@ -16,6 +16,13 @@ function ensureTooltip() {
   }
   return sharedTooltip;
 }
+
+/** 隐藏共享 tooltip：切换视图 / 窗口失焦 / 滚动时调用，避免残留 */
+export function hideGraphTooltip() {
+  if (sharedTooltip) sharedTooltip.style.display = 'none';
+}
+window.addEventListener('blur', hideGraphTooltip);
+window.addEventListener('scroll', hideGraphTooltip, true);
 
 export function createCommitGraph(container, { onNodeClick, onNodeMenu, mode = 'scroll', orientation = 'vertical' } = {}) {
   let rows = [];

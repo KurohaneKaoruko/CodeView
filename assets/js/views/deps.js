@@ -1,7 +1,7 @@
 // 依赖图谱：文件级依赖（力导向图）+ 符号级引用/调用
-import { api } from '../api.js';
-import { el, icon, toast, errToast, extColor } from '../ui.js';
-import { createForceGraph } from '../graph.js';
+import { api } from '../api.js?v=3';
+import { el, icon, toast, errToast, extColor } from '../ui.js?v=3';
+import { createForceGraph } from '../graph.js?v=3';
 
 const state = {
   graph: null,

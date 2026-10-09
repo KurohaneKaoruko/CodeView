@@ -1,6 +1,6 @@
 // AI 分析：独立主视图（左侧快捷与配置，右侧问答流）
-import { api } from '../api.js';
-import { el, icon, toast, errToast } from '../ui.js';
+import { api } from '../api.js?v=3';
+import { el, icon, toast, errToast } from '../ui.js?v=3';
 
 const state = { history: [] }; // {q, answer, err}
 

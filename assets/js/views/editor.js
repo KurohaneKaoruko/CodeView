@@ -1,7 +1,7 @@
 // 编辑器：多标签页、查看（高亮）/编辑双模式、Ctrl+S 保存、面包屑
-import { api } from '../api.js';
-import { el, icon, toast, errToast, fmtSize, confirmDlg } from '../ui.js';
-import { highlight, langOfPath } from '../highlight.js';
+import { api } from '../api.js?v=3';
+import { el, icon, toast, errToast, fmtSize, confirmDlg } from '../ui.js?v=3';
+import { highlight, langOfPath } from '../highlight.js?v=3';
 
 const tabs = [];
 let activePath = null;

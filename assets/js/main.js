@@ -2,6 +2,7 @@
 import { api } from './api.js?v=3';
 import { el, icon, toast, errToast } from './ui.js?v=3';
 import { initPathDrop } from './pathdrop.js?v=3';
+import { hideGraphTooltip } from './gitgraph.js?v=3';
 import * as files from './views/files.js?v=3';
 import * as editor from './views/editor.js?v=3';
 import * as git from './views/gitmgmt.js?v=3';
@@ -98,6 +99,9 @@ document.addEventListener('keydown', (e) => {
 // 侧栏面板由活动栏图标切换（资源/搜索/AI），在所有视图常驻
 function switchView(view, force = false) {
   S.view = view;
+  // 清理上一个视图的浮层残留（悬停提示 / 右键菜单 / 弹窗 / 路径下拉）
+  hideGraphTooltip();
+  document.querySelectorAll('.ctx-menu, .commit-popup, .pathdrop').forEach((n) => n.remove());
   content.querySelectorAll('.view').forEach((v) => v.remove());
   if (view === 'files') {
     setActiveEditor(true);

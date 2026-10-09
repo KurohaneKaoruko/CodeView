@@ -1,6 +1,6 @@
 // 提交/分支对比：任选两个引用（分支、标签、commit id）查看树级差异，行级定位
-import { api } from '../api.js';
-import { el, icon, errToast, toast, renderDiffRows, shortOid } from '../ui.js';
+import { api } from '../api.js?v=3';
+import { el, icon, errToast, toast, renderDiffRows, shortOid } from '../ui.js?v=3';
 
 const state = {
   result: null,

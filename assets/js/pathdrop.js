@@ -1,6 +1,6 @@
 // 路径输入下拉面板：输入路径 / 最近打开 / 文件夹浏览三合一
-import { api } from './api.js';
-import { el, icon } from './ui.js';
+import { api } from './api.js?v=3';
+import { el, icon } from './ui.js?v=3';
 
 export function initPathDrop(input, { onOpen }) {
   let panel = null;
