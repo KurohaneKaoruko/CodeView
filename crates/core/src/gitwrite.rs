@@ -89,14 +89,13 @@ fn finish(root: &Path, mut r: OpResult) -> Result<OpResult> {
 // ---------- 基础操作 ----------
 
 pub fn stage(root: &Path, paths: &[String]) -> Result<OpResult> {
-    let mut args: Vec<&str> = vec!["add", "--"];
     let refs: Vec<String> = paths.iter().map(|p| p.replace('\\', "/")).collect();
     if refs.is_empty() {
-        args.push("-A");
-    } else {
-        for p in &refs {
-            args.push(p);
-        }
+        return run(root, "stage", &["add", "-A"]);
+    }
+    let mut args: Vec<&str> = vec!["add", "--"];
+    for p in &refs {
+        args.push(p);
     }
     run(root, "stage", &args)
 }

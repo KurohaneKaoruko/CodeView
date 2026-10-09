@@ -129,11 +129,16 @@ where
     }
 }
 
+fn clean_path(p: &Path) -> String {
+    let s = p.to_string_lossy().to_string();
+    s.strip_prefix(r"\\?\").map(|x| x.to_string()).unwrap_or(s)
+}
+
 async fn overview(State(app): State<std::sync::Arc<App>>) -> Response {
     let root = app.root.read().unwrap().clone();
     let is_git = gitread::open(&root).is_ok();
     Json(Overview {
-        root: root.to_string_lossy().to_string(),
+        root: clean_path(&root),
         name: root
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -379,6 +384,8 @@ struct ActionReq {
     #[serde(default)]
     index: Option<usize>,
     #[serde(default)]
+    paths: Vec<String>,
+    #[serde(default)]
     force: bool,
     #[serde(default)]
     set_upstream: bool,
@@ -438,6 +445,7 @@ async fn git_action(
                         "revert" => gitwrite::revert(root, &req.target, req.no_commit)?,
                         "cherry-pick" => gitwrite::cherry_pick(root, &req.target)?,
                         "reset" => gitwrite::reset(root, &req.mode, &req.target)?,
+                        "discard" => gitwrite::discard(root, &req.paths)?,
                         "stash" => gitwrite::stash(
                             root,
                             &req.action,

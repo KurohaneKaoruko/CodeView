@@ -1,1 +1,22 @@
-[package]`nname = "cvtest"`nversion = "0.1.0"`nedition = "2021"
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/server", "crates/desktop"]
+default-members = ["crates/core", "crates/server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+git2 = "0.20"
+ignore = "0.4"
+regex = "1"
+tokio = { version = "1", features = ["full"] }
+
+[profile.release]
+opt-level = 2
+lto = false
+strip = true

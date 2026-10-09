@@ -60,6 +60,15 @@ pub fn list_dir(root: &Path, rel: &str) -> Result<Vec<Entry>> {
     for e in fs::read_dir(&dir).with_context(|| format!("读取目录失败: {}", dir.display()))? {
         let e = e?;
         let name = e.file_name().to_string_lossy().to_string();
+        // 隐藏 .git 与常见构建/依赖目录
+        if name == ".git"
+            || matches!(
+                name.as_str(),
+                "target" | "node_modules" | "dist" | "build" | ".venv" | "__pycache__" | ".idea" | ".vscode"
+            )
+        {
+            continue;
+        }
         let p = e.path();
         let meta = e.metadata();
         if p.is_dir() {

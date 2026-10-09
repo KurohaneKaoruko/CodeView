@@ -1,1 +1,46 @@
-<!doctype html><html><body>CodeView placeholder</body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CodeView</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="brand">
+    <span class="logo">CV</span>
+    <span class="brand-name">CodeView<span class="muted" id="proj-name"></span></span>
+  </div>
+  <div class="path-box">
+    <input id="root-input" type="text" spellcheck="false" placeholder="项目路径，例如 D:\work\my-project — 回车打开">
+    <button id="btn-open" class="btn mini">打开</button>
+  </div>
+  <div class="spacer" style="flex:1"></div>
+  <div id="branch-pill" class="pill" title="当前分支"></div>
+</header>
+
+<div id="main">
+  <nav id="activity">
+    <button class="act-btn active" data-view="files" title="资源管理器"></button>
+    <button class="act-btn" data-view="gitlog" title="Git 历史"></button>
+    <button class="act-btn" data-view="gitwork" title="Git 工作区"></button>
+    <button class="act-btn" data-view="deps" title="依赖图谱"></button>
+  </nav>
+  <aside id="side"></aside>
+  <div id="content"></div>
+</div>
+
+<footer id="statusbar">
+  <span class="sb-item" id="sb-root" title="项目根目录"></span>
+  <span class="sb-item" id="sb-branch"></span>
+  <span class="sb-item" id="sb-sync"></span>
+  <span class="sb-item" id="sb-op"></span>
+  <span style="flex:1"></span>
+  <span class="sb-item" id="sb-dirty"></span>
+  <span class="sb-item" id="sb-hint"></span>
+</footer>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

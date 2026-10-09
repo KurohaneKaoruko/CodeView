@@ -68,6 +68,8 @@ pub fn lang_of(ext: &str) -> Option<&'static str> {
         "cc" | "cpp" | "cxx" | "hpp" | "hh" | "hxx" => "cpp",
         "go" => "go",
         "java" => "java",
+        // 以下仅用于索引与依赖解析目标，不参与符号提取
+        "json" => "json",
         _ => return None,
     })
 }
@@ -132,13 +134,30 @@ fn exists(idx: &Indexed, rel: &str) -> Option<String> {
 }
 
 /// 解析路径片段为候选相对路径，探测各种扩展名组合。
+fn normalize_rel(p: &str) -> Option<String> {
+    let mut out: Vec<&str> = Vec::new();
+    for seg in p.split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                if out.is_empty() {
+                    return None; // 越出项目根
+                }
+                out.pop();
+            }
+            s => out.push(s),
+        }
+    }
+    Some(out.join("/"))
+}
+
 fn resolve_spec(idx: &Indexed, from_dir: &str, spec: &str, roots: &[String], langs: &[&str]) -> Option<String> {
     let spec = spec.trim();
     let exts: Vec<&str> = langs
         .iter()
         .flat_map(|l| match *l {
-            "js" => vec!["js", "jsx", "mjs", "cjs", "ts", "tsx"],
-            "ts" => vec!["ts", "tsx", "js", "jsx"],
+            "js" => vec!["js", "jsx", "mjs", "cjs", "ts", "tsx", "json"],
+            "ts" => vec!["ts", "tsx", "js", "jsx", "json"],
             "py" => vec!["py"],
             _ => vec![],
         })
@@ -162,39 +181,24 @@ fn resolve_spec(idx: &Indexed, from_dir: &str, spec: &str, roots: &[String], lan
         cands
     };
 
-    // 相对导入
-    let normalized: String = {
-        // 处理 ./ ../ 归一化
-        let mut parts: Vec<&str> = Vec::new();
-        let abs = spec.starts_with('/');
-        let mut depth = 0usize;
-        for seg in spec.split('/') {
-            match seg {
-                "." | "" => {}
-                ".." => {
-                    if let Some(last_non_dot) = parts.last() {
-                        if *last_non_dot != ".." {
-                            parts.pop();
-                            continue;
-                        }
-                    }
-                    depth += 1;
-                    parts.push("..");
-                }
-                s => parts.push(s),
-            }
-            let _ = abs;
-            let _ = depth;
-        }
-        parts.join("/")
+    // 归一化 ./ ../：相对导入以 from_dir 为基准；其余以给定 root 为基准
+    let normalized: Option<String> = if spec.starts_with('.') {
+        normalize_rel(&format!("{}/{}", from_dir, spec))
+    } else {
+        normalize_rel(spec)
+    };
+    let normalized = match normalized {
+        Some(n) => n,
+        None => return None,
     };
 
-    let bases: Vec<String> = if spec.starts_with('.') {
-        vec![from_dir.to_string()]
+    let mut bases: Vec<String> = Vec::new();
+    if spec.starts_with('.') {
+        bases.push(String::new()); // 已并入 normalized
     } else {
-        roots.to_vec()
-    };
-    // “@/” 别名 → 常见 src 根
+        bases.extend(roots.iter().cloned());
+    }
+    // “@/”、“~/” 别名 → 常见 src 根
     let aliases: Vec<String> = if let Some(rest) = spec.strip_prefix("@/") {
         vec![format!("src/{rest}"), rest.to_string()]
     } else if spec.starts_with("~/") {
@@ -204,7 +208,15 @@ fn resolve_spec(idx: &Indexed, from_dir: &str, spec: &str, roots: &[String], lan
     };
 
     for base in bases.iter().chain(aliases.iter()) {
-        for cand in make_candidates(base, &normalized) {
+        let target = if base.is_empty() {
+            normalized.clone()
+        } else {
+            match normalize_rel(&format!("{base}/{normalized}")) {
+                Some(t) => t,
+                None => continue,
+            }
+        };
+        for cand in make_candidates("", &target) {
             if let Some(hit) = exists(idx, &cand) {
                 return Some(hit);
             }
@@ -275,14 +287,17 @@ fn extract_edges(idx: &Indexed, rel: &str, lang: &str, content: &str, root: &Pat
             }
         }
         "py" => {
-            // 顶层包解析：尝试项目根；再尝试当前目录向上到根的每一级
-            let mut roots: Vec<String> = vec![String::new()];
+            // 顶层包解析：当前文件目录 + 项目根 + 逐级向上
+            let mut roots: Vec<String> = vec![from_dir.clone()];
             let mut dir = from_dir.clone();
-            while !dir.is_empty() {
+            loop {
                 dir = match dir.rfind('/') {
                     Some(i) => dir[..i].to_string(),
                     None => String::new(),
                 };
+                if roots.contains(&dir) {
+                    break;
+                }
                 roots.push(dir.clone());
                 if dir.is_empty() {
                     break;
