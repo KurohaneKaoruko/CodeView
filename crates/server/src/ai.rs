@@ -91,7 +91,7 @@ pub fn ask(req: &AskReq, project_tree: Option<String>, git_digest: Option<String
         context.push_str(&format!("<当前文件 path=\"{}\">\n{}\n</当前文件>\n\n", f.path, content));
     }
 
-    let system = "你是 CodeView 的编程助手，服务于一个代码查看器。回答要求：使用中文；结构清晰（可用小标题与列表）；结论先行；涉及代码时给出具体文件路径与行号；不确定的内容明确说明。";
+    let system = "你是 CodeView 的只读代码分析助手：可以查看项目结构、源代码与 git 历史，但无法修改任何代码。用户会要求分析项目结构、代码质量、潜在缺陷等。回答要求：使用中文；结论先行、结构化（小标题+列表）；涉及代码时给出具体文件路径与行号；分析结果应整理为结构清晰、可直接保存为 Markdown 文档的形式；不确定的内容明确说明。";
     let user = format!("{context}问题：{}", req.question.trim());
 
     let url = format!("{}/chat/completions", cfg.base_url.trim_end_matches('/'));

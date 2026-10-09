@@ -131,7 +131,7 @@ export function formModal({ title, icon: iconName, fields = [], okText = '确定
           values[f.key] = () => input.checked;
           return field;
         } else {
-          input = el('input', { type: 'text', value: f.value || '', placeholder: f.placeholder || '', spellcheck: 'false' });
+          input = el('input', { type: f.type === 'password' ? 'password' : 'text', value: f.value || '', placeholder: f.placeholder || '', spellcheck: 'false' });
         }
         inputs[f.key] = input;
         values[f.key] = () => input.value;

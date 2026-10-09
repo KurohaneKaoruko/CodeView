@@ -679,7 +679,7 @@ async fn ai_ask(State(app): State<std::sync::Arc<App>>, Json(req): Json<ai::AskR
     .await
 }
 
-/// 收集项目结构（前两层目录 + 文件数）
+/// 收集项目结构（目录 + 按扩展名统计文件数与行数）
 fn collect_tree(root: &Path) -> String {
     use std::collections::BTreeMap;
     let walker = ignore::WalkBuilder::new(root)
@@ -688,6 +688,8 @@ fn collect_tree(root: &Path) -> String {
         .build();
     let mut dirs: BTreeMap<String, usize> = BTreeMap::new();
     let mut files: Vec<String> = Vec::new();
+    let mut ext_stat: BTreeMap<String, (usize, u64)> = BTreeMap::new(); // ext -> (文件数, 行数)
+    let mut total_files = 0usize;
     for e in walker.flatten() {
         if !e.file_type().map(|t| t.is_file()).unwrap_or(false) {
             continue;
@@ -696,6 +698,17 @@ fn collect_tree(root: &Path) -> String {
             Ok(r) => r.to_string_lossy().replace('\\', "/"),
             Err(_) => continue,
         };
+        total_files += 1;
+        if total_files > 600 {
+            break;
+        }
+        let ext = e
+            .path()
+            .extension()
+            .map(|x| x.to_string_lossy().to_lowercase())
+            .unwrap_or_else(|| "-".into());
+        let entry = ext_stat.entry(ext).or_insert((0, 0));
+        entry.0 += 1;
         let parts: Vec<&str> = rel.split('/').collect();
         if parts.len() <= 1 {
             files.push(rel);
@@ -703,6 +716,12 @@ fn collect_tree(root: &Path) -> String {
             *dirs.entry(format!("{}/", parts[..parts.len() - 1].join("/"))).or_default() += 1;
             if files.len() < 400 {
                 files.push(rel);
+            }
+        }
+        // 行数统计（≤200KB 的文本文件，避免拖慢大仓库）
+        if let Ok(bytes) = std::fs::read(e.path()) {
+            if bytes.len() <= 200 * 1024 && !bytes.contains(&0) {
+                entry.1 += bytes.iter().filter(|&&b| b == b'\n').count() as u64 + 1;
             }
         }
         if dirs.len() + files.len() > 600 {
@@ -717,6 +736,11 @@ fn collect_tree(root: &Path) -> String {
         out.push_str(f);
         out.push('\n');
     }
+    out.push_str("\n<代码统计>\n");
+    for (ext, (n, lines)) in ext_stat.iter() {
+        out.push_str(&format!(".{ext}: {n} 个文件, 约 {lines} 行\n"));
+    }
+    out.push_str(&format!("合计约 {} 个文件\n</代码统计>\n", total_files));
     out
 }
 
