@@ -8,6 +8,8 @@
 use anyhow::{anyhow, bail, Context, Result};
 use std::path::PathBuf;
 
+mod genstress;
+
 fn install() -> Result<()> {
     let exe = std::env::current_exe()?;
     let home = std::env::var("USERPROFILE")
@@ -128,6 +130,24 @@ fn main() -> Result<()> {
     }
     if args.first().map(|s| s.as_str()) == Some("uninstall") {
         return uninstall();
+    }
+    if args.first().map(|s| s.as_str()) == Some("genstress") {
+        let mut path = None;
+        let mut files = 240usize;
+        let mut commits = 60usize;
+        let mut branches = 12usize;
+        let mut it = args.iter().skip(1);
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--files" => files = it.next().context("--files 缺参数")?.parse()?,
+                "--commits" => commits = it.next().context("--commits 缺参数")?.parse()?,
+                "--branches" => branches = it.next().context("--branches 缺参数")?.parse()?,
+                p if !p.starts_with('-') => path = Some(PathBuf::from(p)),
+                _ => {}
+            }
+        }
+        let p = path.context("genstress 需要目标路径，例如: codeview genstress D:\\tmp\\stress")?;
+        return genstress::generate(&p, files, commits, branches);
     }
     let (path_arg, port, open_browser) = parse_args(&args)?;
 

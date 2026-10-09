@@ -16,6 +16,133 @@ use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use tokio::sync::oneshot;
 
+// ---------------- 最近打开的项目 ----------------
+
+fn home_dir() -> Option<PathBuf> {
+    std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .ok()
+        .map(PathBuf::from)
+}
+
+fn recent_file() -> Option<PathBuf> {
+    home_dir().map(|h| h.join(".codeview").join("recent.json"))
+}
+
+fn load_recent() -> Vec<String> {
+    let Some(f) = recent_file() else { return vec![] };
+    std::fs::read_to_string(f)
+        .ok()
+        .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
+        .unwrap_or_default()
+}
+
+fn record_recent(path: &str) {
+    let Some(f) = recent_file() else { return };
+    if let Some(parent) = f.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let mut items = load_recent();
+    items.retain(|p| !p.eq_ignore_ascii_case(path));
+    items.insert(0, path.to_string());
+    items.truncate(10);
+    if let Ok(t) = serde_json::to_string_pretty(&items) {
+        let _ = std::fs::write(f, t);
+    }
+}
+
+#[derive(Serialize)]
+struct RecentList {
+    items: Vec<String>,
+}
+
+async fn recent() -> Response {
+    Json(RecentList { items: load_recent() }).into_response()
+}
+
+// ---------------- 目录浏览（供路径下拉的文件夹选择器） ----------------
+
+#[derive(Serialize)]
+struct BrowseEntry {
+    name: String,
+    path: String,
+    kind: String, // dir / drive
+}
+
+#[derive(Serialize)]
+struct BrowseResult {
+    current: String,
+    parent: Option<String>,
+    entries: Vec<BrowseEntry>,
+}
+
+fn clean_path(p: &Path) -> String {
+    let s = p.to_string_lossy().to_string();
+    s.strip_prefix(r"\\?\").map(|x| x.to_string()).unwrap_or(s)
+}
+
+async fn browse(Query(q): Query<HashMap<String, String>>) -> Response {
+    let raw = q.get("path").cloned().unwrap_or_default();
+    let result: Result<BrowseResult> = tokio::task::spawn_blocking(move || {
+        if raw.is_empty() {
+            // 根：Windows 列出盘符，其他平台列根目录
+            let mut entries = Vec::new();
+            #[cfg(windows)]
+            {
+                for c in b'A'..=b'Z' {
+                    let drive = format!("{}:\\", c as char);
+                    if Path::new(&drive).exists() {
+                        entries.push(BrowseEntry {
+                            name: format!("{}:", c as char),
+                            path: drive.clone(),
+                            kind: "drive".into(),
+                        });
+                    }
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                entries.push(BrowseEntry {
+                    name: "/".into(),
+                    path: "/".into(),
+                    kind: "drive".into(),
+                });
+            }
+            Ok(BrowseResult { current: String::new(), parent: None, entries })
+        } else {
+            let p = PathBuf::from(&raw);
+            if !p.is_dir() {
+                bail!("不是目录: {raw}");
+            }
+            let current = clean_path(&p);
+            let parent = p.parent().map(|x| clean_path(x));
+            let mut entries = Vec::new();
+            let rd = std::fs::read_dir(&p).map_err(|e| anyhow::anyhow!("读取目录失败: {e}"))?;
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().to_string();
+                if name.starts_with('.') || name == "target" || name == "node_modules" {
+                    continue;
+                }
+                if e.path().is_dir() {
+                    entries.push(BrowseEntry {
+                        name,
+                        path: clean_path(&e.path()),
+                        kind: "dir".into(),
+                    });
+                }
+            }
+            entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+            Ok(BrowseResult { current, parent, entries })
+        }
+    })
+    .await
+    .unwrap_or_else(|e| Err(anyhow::anyhow!("{e}")));
+    match result {
+        Ok(v) => Json(v).into_response(),
+        Err(e) => json_err(format!("{e:#}")),
+    }
+}
+
 // ---------------- 静态资源（内嵌共享前端） ----------------
 
 #[derive(rust_embed::RustEmbed)]
@@ -129,11 +256,6 @@ where
     }
 }
 
-fn clean_path(p: &Path) -> String {
-    let s = p.to_string_lossy().to_string();
-    s.strip_prefix(r"\\?\").map(|x| x.to_string()).unwrap_or(s)
-}
-
 async fn overview(State(app): State<std::sync::Arc<App>>) -> Response {
     let root = app.root.read().unwrap().clone();
     let is_git = gitread::open(&root).is_ok();
@@ -162,7 +284,8 @@ async fn open_project(State(app): State<std::sync::Arc<App>>, Json(req): Json<Op
     if !p.is_dir() {
         return json_err("不是目录".into());
     }
-    *app.root.write().unwrap() = p;
+    *app.root.write().unwrap() = p.clone();
+    record_recent(&clean_path(&p));
     overview(State(app)).await
 }
 
@@ -526,6 +649,8 @@ fn router(app: std::sync::Arc<App>) -> Router {
     Router::new()
         .route("/api/overview", get(overview))
         .route("/api/open", post(open_project))
+        .route("/api/recent", get(recent))
+        .route("/api/browse", get(browse))
         .route("/api/tree", get(tree))
         .route("/api/file", get(get_file).put(put_file))
         .route("/api/file/delete", post(delete_file))
@@ -550,6 +675,7 @@ fn router(app: std::sync::Arc<App>) -> Router {
 
 /// 绑定端口并以后台任务方式启动 HTTP 服务，返回实际端口。
 pub async fn start_server(root: PathBuf, port: u16) -> Result<u16> {
+    record_recent(&clean_path(&root));
     let app_state = std::sync::Arc::new(App {
         root: RwLock::new(root),
     });

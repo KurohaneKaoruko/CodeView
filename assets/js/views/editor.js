@@ -1,6 +1,6 @@
 // 编辑器：多标签页、查看（高亮）/编辑双模式、Ctrl+S 保存、面包屑
 import { api } from '../api.js';
-import { el, icon, toast, errToast, fmtSize } from '../ui.js';
+import { el, icon, toast, errToast, fmtSize, confirmDlg } from '../ui.js';
 import { highlight, langOfPath } from '../highlight.js';
 
 const tabs = [];
@@ -41,6 +41,21 @@ export function openFile(path) {
   }).catch(errToast);
 }
 
+export function clearAll() {
+  tabs.length = 0;
+  activePath = null;
+  pendingLine = null;
+  render();
+}
+
+export function cycleTab(dir = 1) {
+  if (tabs.length < 2) return;
+  const i = tabs.findIndex((t) => t.path === activePath);
+  const next = tabs[(i + dir + tabs.length) % tabs.length];
+  activePath = next.path;
+  render();
+}
+
 /** 打开文件并跳转到指定行（阅读模式下高亮该行） */
 export function openFileAt(path, line) {
   pendingLine = line;
@@ -66,23 +81,38 @@ export async function saveActive() {
   if (!t) return;
   if (t.binary) { toast('二进制文件不支持编辑保存', 'err'); return; }
   try {
+    // 记住光标与滚动位置，保存后恢复（避免整页重渲染打断输入）
+    const ta = document.querySelector('.editor-body textarea');
+    const sel = ta ? { start: ta.selectionStart, end: ta.selectionEnd, top: ta.scrollTop } : null;
     await api.saveFile(t.path, t.content);
     t.orig = t.content;
     toast(`已保存 ${t.path}`, 'ok');
     render();
+    if (sel) {
+      const ta2 = document.querySelector('.editor-body textarea');
+      if (ta2) {
+        ta2.focus();
+        ta2.setSelectionRange(sel.start, sel.end);
+        ta2.scrollTop = sel.top;
+      }
+    }
     window.CodeView.gitChanged();
   } catch (e) { errToast(e); }
 }
 
 function closeTab(path) {
   const t = tabs.find((x) => x.path === path);
+  const doClose = () => {
+    const i = tabs.findIndex((x) => x.path === path);
+    if (i >= 0) tabs.splice(i, 1);
+    if (activePath === path) activePath = tabs.length ? tabs[Math.min(i, tabs.length - 1)].path : null;
+    render();
+  };
   if (t && t.content !== t.orig) {
-    if (!confirm(`${t.path} 有未保存的修改，确定关闭？`)) return;
+    confirmDlg(`${t.path} 有未保存的修改，确定关闭？`, '关闭').then((ok) => { if (ok) doClose(); });
+  } else {
+    doClose();
   }
-  const i = tabs.findIndex((x) => x.path === path);
-  if (i >= 0) tabs.splice(i, 1);
-  if (activePath === path) activePath = tabs.length ? tabs[Math.min(i, tabs.length - 1)].path : null;
-  render();
 }
 
 function notifyDirty() {
@@ -93,6 +123,11 @@ function render() {
   if (!container) return;
   container.innerHTML = '';
   notifyDirty();
+  // openFileAt 跳行时强制回到阅读模式
+  if (pendingLine != null) {
+    const cur0 = tabs.find((x) => x.path === activePath);
+    if (cur0) cur0.editMode = false;
+  }
 
   // 标签栏
   const tabBar = el('div', { class: 'tabs' });

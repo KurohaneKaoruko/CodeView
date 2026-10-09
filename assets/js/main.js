@@ -1,6 +1,7 @@
 // CodeView 前端入口
 import { api } from './api.js';
 import { el, icon, toast, errToast } from './ui.js';
+import { initPathDrop } from './pathdrop.js';
 import * as files from './views/files.js';
 import * as editor from './views/editor.js';
 import * as gitlog from './views/gitlog.js';
@@ -17,7 +18,7 @@ const content = document.getElementById('content');
 const ACT_ICONS = { files: 'code', gitlog: 'history', gitwork: 'branch', compare: 'compare', deps: 'package' };
 document.querySelectorAll('.act-btn').forEach((b) => {
   b.append(icon(ACT_ICONS[b.dataset.view], 20));
-  b.addEventListener('click', () => switchView(b.dataset.view));
+  b.addEventListener('click', () => switchView(b.dataset.view, true));
 });
 
 // 编辑器容器常驻（切换视图时隐藏/显示以保留状态）
@@ -47,7 +48,7 @@ window.CodeView = {
   },
   gitChanged: () => {
     files.refreshGitStatus();
-    refreshStatusbar();
+    refreshRefsCache().then(refreshStatusbar);
     if (S.view === 'gitwork' && window.CodeView._workRefresh) window.CodeView._workRefresh();
   },
   refreshStatusbar,
@@ -64,27 +65,38 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (S.view === 'files') editor.saveActive();
   }
+  // Ctrl+Tab 切换编辑器标签
+  if (e.ctrlKey && e.key === 'Tab') {
+    e.preventDefault();
+    if (S.view === 'files') editor.cycleTab(1);
+  }
 });
 
-// ---- 视图切换 ----
-function switchView(view) {
+// ---- 视图切换（force：手动点击时即使同视图也重绘） ----
+function switchView(view, force = false) {
+  const same = S.view === view;
   S.view = view;
   document.querySelectorAll('.act-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   content.querySelectorAll('.view').forEach((v) => v.remove());
-  setActiveEditor(view === 'files');
   if (view === 'files') {
-    side.classList.add('visible');
-    files.render(side);
-  } else {
-    side.classList.remove('visible');
-    side.innerHTML = '';
-    const holder = el('div', { class: 'view' });
-    content.append(holder);
-    if (view === 'gitlog') gitlog.render(holder);
-    else if (view === 'gitwork') gitwork.render(holder);
-    else if (view === 'compare') compare.render(holder);
-    else if (view === 'deps') deps.render(holder);
+    setActiveEditor(true);
+    if (force || !same || !side.children.length) {
+      files.render(side);
+      side.classList.add('visible');
+    } else {
+      side.classList.add('visible');
+    }
+    return;
   }
+  setActiveEditor(false);
+  side.classList.remove('visible');
+  side.innerHTML = '';
+  const holder = el('div', { class: 'view' });
+  content.append(holder);
+  if (view === 'gitlog') gitlog.render(holder);
+  else if (view === 'gitwork') gitwork.render(holder);
+  else if (view === 'compare') compare.render(holder);
+  else if (view === 'deps') deps.render(holder);
 }
 
 // ---- 打开项目 ----
@@ -102,6 +114,11 @@ document.getElementById('btn-open').addEventListener('click', () => {
 });
 document.getElementById('root-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('btn-open').click();
+});
+
+// 路径下拉：最近打开 + 文件夹浏览
+initPathDrop(document.getElementById('root-input'), {
+  onOpen: (p) => openProject(p),
 });
 
 // ---- 状态栏 ----
@@ -126,7 +143,6 @@ async function refreshStatusbar() {
     let syncText = '';
     if (!st.detached) {
       const b = st.head_branch;
-      // 从 refs 缓存补 ahead/behind
       if (window.__refsCache) {
         const bi = window.__refsCache.locals.find((x) => x.name === b);
         if (bi && bi.upstream) syncText = `↑${bi.ahead ?? 0} ↓${bi.behind ?? 0}`;
@@ -137,7 +153,7 @@ async function refreshStatusbar() {
       ? `${st.in_progress} 进行中${st.conflicted.length ? ` · 冲突 ${st.conflicted.length}` : ''}`
       : (st.conflicted.length ? `冲突 ${st.conflicted.length} 个文件` : '');
     sbOp.title = st.in_progress ? '点击前往 Git 工作区处理' : '';
-    sbOp.onclick = st.in_progress || st.conflicted.length ? () => switchView('gitwork') : null;
+    sbOp.onclick = st.in_progress || st.conflicted.length ? () => switchView('gitwork', true) : null;
   } catch { /* ignore */ }
 }
 
@@ -153,11 +169,15 @@ async function boot() {
   document.getElementById('sb-root').textContent = S.overview.root;
   document.getElementById('sb-root').title = S.overview.root;
   document.getElementById('proj-name').textContent = ` — ${S.overview.name}`;
+  document.getElementById('sb-hint').textContent = 'Ctrl+S 保存 · Ctrl+Tab 切换标签';
   document.title = `CodeView — ${S.overview.name}`;
+  // 项目切换：清空各视图残留状态
+  window.__rootStamp = S.overview.root;
+  editor.clearAll();
   await refreshRefsCache();
   await refreshStatusbar();
   files.refreshGitStatus();
-  switchView('files');
+  switchView('files', true);
 }
 
 (async function start() {

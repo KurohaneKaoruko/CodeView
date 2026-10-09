@@ -118,8 +118,8 @@ export function render(content) {
       ),
     ));
 
-    // 变更卡片
-    const section = (title, iconName, files, actions) => {
+    // 变更卡片（显式 staged 标志，避免标题字符串误判）
+    const section = (title, iconName, files, actions, staged) => {
       const box = el('div', { class: 'card' });
       box.append(el('div', { class: 'card-h' }, icon(iconName, 13), title, el('span', { class: 'count' }, files.length),
         el('span', { style: { flex: 1 } }),
@@ -131,7 +131,7 @@ export function render(content) {
           el('span', { class: `chg-${f.code}`, style: { fontWeight: 700 } }, f.code),
           el('span', {
             class: 'path', title: '点击查看差异',
-            onclick: () => { state.selectedDiff = { path: f.path, staged: title.includes('暂存') }; refreshDiff(); },
+            onclick: () => { state.selectedDiff = { path: f.path, staged: !!staged }; refreshDiff(); },
           }, f.path),
           ...(actions?.row ? actions.row(f) : []),
         ));
@@ -145,18 +145,22 @@ export function render(content) {
       section('暂存的更改', 'check', st.staged, {
         header: el('button', { class: 'icon-btn', title: '全部取消暂存', onclick: () => act(() => api.gitUnstage([])) }, icon('revert', 13)),
         row: (f) => [el('button', { class: 'icon-btn', title: '取消暂存', onclick: () => act(() => api.gitUnstage([f.path])) }, icon('x', 12))],
-      }),
+      }, true),
       section('未暂存的更改', 'edit', st.unstaged, {
         header: el('button', { class: 'icon-btn', title: '全部暂存', onclick: () => act(() => api.gitStage([]), '已全部暂存') }, icon('plus', 13)),
         row: (f) => [
           el('button', { class: 'icon-btn', title: '暂存', onclick: () => act(() => api.gitStage([f.path])) }, icon('plus', 12)),
           el('button', { class: 'icon-btn danger', title: '丢弃改动', onclick: () => discardOne(f) }, icon('revert', 12)),
         ],
-      }),
+      }, false),
       section('未跟踪', 'file', st.untracked, {
         header: el('button', { class: 'icon-btn', title: '全部暂存', onclick: () => act(() => api.gitStage([])) }, icon('plus', 13)),
         row: (f) => [el('button', { class: 'icon-btn', title: '加入版本控制', onclick: () => act(() => api.gitStage([f.path])) }, icon('plus', 12))],
-      }),
+      }, false),
+      el('div', { class: 'work-actions' },
+        el('button', { class: 'btn mini', onclick: () => act(() => api.gitStage([]), '已全部暂存') }, '全部暂存 +'),
+        el('button', { class: 'btn mini', onclick: () => act(() => api.gitUnstage([])) }, '全部取消暂存 −'),
+      ),
     );
 
     // 分支卡片

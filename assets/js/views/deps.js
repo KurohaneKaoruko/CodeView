@@ -7,9 +7,15 @@ const state = {
   graph: null,
   mode: 'files',
   selectedFile: null,
+  lastRoot: null,
 };
 
 export function render(content) {
+  if (state.lastRoot !== window.__rootStamp) {
+    state.graph = null;
+    state.selectedFile = null;
+    state.lastRoot = window.__rootStamp;
+  }
   content.innerHTML = '';
   const wrap = el('div', { class: 'deps-wrap' });
   content.append(wrap);
@@ -61,12 +67,17 @@ export function render(content) {
   async function loadGraph() {
     try {
       state.graph = await api.depsGraph();
-      document.getElementById('deps-meta').textContent =
-        `${state.graph.nodes.length} 文件 · ${state.graph.edges.length} 条依赖` + (state.graph.truncated ? '（已截断）' : '');
       drawGraph();
     } catch (e) {
       info.innerHTML = '';
       info.append(el('div', { class: 'inner' }, el('div', { class: 'empty-hint' }, `分析失败：${e.message}`)));
+    }
+  }
+
+  function updateMeta() {
+    const m = document.getElementById('deps-meta');
+    if (m && state.graph) {
+      m.textContent = `${state.graph.nodes.length} 文件 · ${state.graph.edges.length} 条依赖` + (state.graph.truncated ? '（已截断）' : '');
     }
   }
 
@@ -85,6 +96,7 @@ export function render(content) {
 
   function drawGraph() {
     if (!state.graph) return;
+    updateMeta();
     segFiles.classList.add('on');
     segSyms.classList.remove('on');
     cyclesBar();

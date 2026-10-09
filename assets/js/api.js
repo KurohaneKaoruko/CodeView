@@ -15,6 +15,8 @@ export const api = {
   overview: () => fetch('/api/overview').then(handle),
   openProject: (path) =>
     fetch('/api/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }).then(handle),
+  recent: () => fetch('/api/recent').then(handle),
+  browse: (path = '') => fetch(`/api/browse?path=${encodeURIComponent(path)}`).then(handle),
   tree: (path = '') => fetch(`/api/tree?path=${encodeURIComponent(path)}`).then(handle),
   file: (path) => fetch(`/api/file?path=${encodeURIComponent(path)}`).then(handle),
   saveFile: (path, content) =>

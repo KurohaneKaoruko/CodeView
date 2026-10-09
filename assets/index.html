@@ -9,11 +9,10 @@
 <body>
 <header id="topbar">
   <div class="brand">
-    <span class="logo">CV</span>
     <span class="brand-name">CodeView<span class="muted" id="proj-name"></span></span>
   </div>
-  <div class="path-box">
-    <input id="root-input" type="text" spellcheck="false" placeholder="项目路径，例如 D:\work\my-project — 回车打开">
+  <div class="path-box" id="path-box">
+    <input id="root-input" type="text" spellcheck="false" autocomplete="off" placeholder="点击选择或输入项目路径 — 回车打开">
     <button id="btn-open" class="btn mini">打开</button>
   </div>
   <div class="spacer" style="flex:1"></div>

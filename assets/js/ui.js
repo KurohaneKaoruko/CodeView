@@ -152,6 +152,38 @@ export function confirmDlg(message, okText = '确定') {
   return formModal({ title: message, icon: 'warn', fields: [], okText, danger: true }).then((v) => !!v);
 }
 
+// ---- 内联输入气泡：轻量替代居中弹窗（如“在此创建分支”） ----
+export function popoverInput(x, y, { label, value = '', placeholder = '', okText = '确定', onOk }) {
+  document.querySelectorAll('.ctx-menu').forEach((m) => m.remove());
+  const input = el('input', { type: 'text', value, placeholder, spellcheck: 'false', style: { width: '220px', fontFamily: 'var(--mono)', fontSize: '12px' } });
+  const box = el('div', { class: 'ctx-menu', style: { minWidth: '260px', padding: '10px' } },
+    el('div', { style: { fontSize: '11.5px', color: 'var(--fg-dim)', marginBottom: '8px' } }, label),
+    el('div', { style: { display: 'flex', gap: '6px' } },
+      input,
+      el('button', {
+        class: 'btn mini primary',
+        onclick: () => { const v = input.value.trim(); if (v) { cleanup(); onOk && onOk(v); } },
+      }, okText),
+    ),
+  );
+  const cleanup = () => { box.remove(); document.removeEventListener('mousedown', outside, true); document.removeEventListener('keydown', onKey); };
+  const outside = (e) => { if (!box.contains(e.target)) cleanup(); };
+  const onKey = (e) => {
+    if (e.key === 'Escape') cleanup();
+    if (e.key === 'Enter') {
+      const v = input.value.trim();
+      if (v) { cleanup(); onOk && onOk(v); }
+    }
+  };
+  document.addEventListener('mousedown', outside, true);
+  document.addEventListener('keydown', onKey);
+  document.body.append(box);
+  const rect = box.getBoundingClientRect();
+  box.style.left = `${Math.min(x, innerWidth - rect.width - 8)}px`;
+  box.style.top = `${Math.min(y, innerHeight - rect.height - 8)}px`;
+  setTimeout(() => { input.focus(); input.select(); }, 0);
+}
+
 // ---- 右键菜单 ----
 export function contextMenu(x, y, items) {
   document.querySelectorAll('.ctx-menu').forEach((m) => m.remove());

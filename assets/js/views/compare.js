@@ -5,9 +5,15 @@ import { el, icon, errToast, toast, renderDiffRows, shortOid } from '../ui.js';
 const state = {
   result: null,
   selectedFile: null,
+  lastRoot: null,
 };
 
 export function render(content) {
+  if (state.lastRoot !== window.__rootStamp) {
+    state.result = null;
+    state.selectedFile = null;
+    state.lastRoot = window.__rootStamp;
+  }
   content.innerHTML = '';
   const wrap = el('div', { class: 'work-wrap' });
   content.append(wrap);

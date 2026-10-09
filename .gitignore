@@ -2,6 +2,9 @@
 /target
 **/*.rs.bk
 
+# 测试仓库
+/testbed/
+
 # Tauri 构建产物
 crates/desktop/gen/
 
