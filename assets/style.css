@@ -129,7 +129,6 @@ svg.ic { flex: 0 0 auto; vertical-align: -2px; }
   content: ''; position: absolute; left: -4px; top: 8px; bottom: 8px;
   width: 3px; border-radius: 3px; background: var(--accent);
 }
-.act-sep { width: 24px; height: 1px; background: var(--border-strong); margin: 6px 0; border-radius: 1px; }
 .act-badge {
   position: absolute; top: 3px; right: 3px; min-width: 15px; height: 15px;
   border-radius: 8px; background: var(--red); color: #fff;
