@@ -8,6 +8,8 @@ const state = {
   selected: null,
 };
 
+let host = null;
+
 const EXT_LANG = {
   rs: 'Rust', js: 'JavaScript', mjs: 'JavaScript', cjs: 'JavaScript', jsx: 'JavaScript',
   ts: 'TypeScript', tsx: 'TypeScript', py: 'Python', go: 'Go', java: 'Java',
@@ -31,10 +33,10 @@ function statusClass(path) {
   return c ? `st-${c}` : '';
 }
 
-export function render(side) {
-  side.classList.add('visible');
-  side.innerHTML = '';
-  side.append(el('div', { class: 'side-head' }, '资源管理器',
+export function render(sideHost) {
+  host = sideHost;
+  host.innerHTML = '';
+  host.append(el('div', { class: 'side-head' }, '资源管理器',
     el('span', { class: 'btns' },
       el('button', { class: 'icon-btn', title: '新建文件', onclick: () => newAt('') }, icon('file', 14)),
       el('button', { class: 'icon-btn', title: '新建文件夹', onclick: () => newAt('', 'dir') }, icon('folder', 14)),
@@ -42,13 +44,12 @@ export function render(side) {
     ),
   ));
   const root = el('div', {});
-  side.append(root);
+  host.append(root);
   loadChildren('', root, 0);
 }
 
 function rerender() {
-  const side = document.getElementById('side');
-  if (side.classList.contains('visible')) render(side);
+  if (host && host.isConnected) render(host);
 }
 
 async function loadChildren(path, container, depth) {

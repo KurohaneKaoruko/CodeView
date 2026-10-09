@@ -4,18 +4,19 @@ import { el, icon, toast, errToast } from './ui.js';
 import { initPathDrop } from './pathdrop.js';
 import * as files from './views/files.js';
 import * as editor from './views/editor.js';
-import * as gitlog from './views/gitlog.js';
-import * as gitwork from './views/gitwork.js';
+import * as git from './views/gitmgmt.js';
 import * as compare from './views/compare.js';
 import * as deps from './views/deps.js';
+import * as searchPanel from './views/searchpanel.js';
+import * as aiPanel from './views/ai.js';
 
-const S = { overview: null, view: 'files' };
+const S = { overview: null, view: 'files', sideTab: 'files' };
 
 const side = document.getElementById('side');
 const content = document.getElementById('content');
 
 // 活动栏图标
-const ACT_ICONS = { files: 'code', gitlog: 'history', gitwork: 'branch', compare: 'compare', deps: 'package' };
+const ACT_ICONS = { files: 'code', git: 'branch', compare: 'compare', deps: 'package' };
 document.querySelectorAll('.act-btn').forEach((b) => {
   b.append(icon(ACT_ICONS[b.dataset.view], 20));
   b.addEventListener('click', () => switchView(b.dataset.view, true));
@@ -49,7 +50,7 @@ window.CodeView = {
   gitChanged: () => {
     files.refreshGitStatus();
     refreshRefsCache().then(refreshStatusbar);
-    if (S.view === 'gitwork' && window.CodeView._workRefresh) window.CodeView._workRefresh();
+    if (S.view === 'git' && window.CodeView._workRefresh) window.CodeView._workRefresh();
   },
   refreshStatusbar,
   fileRenamed: editor.fileRenamed,
@@ -80,12 +81,8 @@ function switchView(view, force = false) {
   content.querySelectorAll('.view').forEach((v) => v.remove());
   if (view === 'files') {
     setActiveEditor(true);
-    if (force || !same || !side.children.length) {
-      files.render(side);
-      side.classList.add('visible');
-    } else {
-      side.classList.add('visible');
-    }
+    side.classList.add('visible');
+    if (force || !same || !side.children.length) renderSidebar();
     return;
   }
   setActiveEditor(false);
@@ -93,10 +90,30 @@ function switchView(view, force = false) {
   side.innerHTML = '';
   const holder = el('div', { class: 'view' });
   content.append(holder);
-  if (view === 'gitlog') gitlog.render(holder);
-  else if (view === 'gitwork') gitwork.render(holder);
+  if (view === 'git') git.render(holder);
   else if (view === 'compare') compare.render(holder);
   else if (view === 'deps') deps.render(holder);
+}
+
+// ---- 侧栏：资源 / 搜索 / AI 三个小标签 ----
+function renderSidebar() {
+  side.innerHTML = '';
+  const tabs = el('div', { class: 'side-tabs' });
+  const host = el('div', { class: 'side-host' });
+  const defs = [
+    { key: 'files', label: '资源', ic: 'code', render: (h) => files.render(h) },
+    { key: 'search', label: '搜索', ic: 'search', render: (h) => searchPanel.render(h, { focus: true }) },
+    { key: 'ai', label: 'AI', ic: 'sparkles', render: (h) => aiPanel.render(h) },
+  ];
+  for (const d of defs) {
+    tabs.append(el('button', {
+      class: `side-tab${S.sideTab === d.key ? ' active' : ''}`,
+      onclick: () => { S.sideTab = d.key; renderSidebar(); },
+    }, icon(d.ic, 13), d.label));
+  }
+  side.append(tabs, host);
+  const cur = defs.find((d) => d.key === S.sideTab) || defs[0];
+  cur.render(host);
 }
 
 // ---- 打开项目 ----
@@ -153,7 +170,7 @@ async function refreshStatusbar() {
       ? `${st.in_progress} 进行中${st.conflicted.length ? ` · 冲突 ${st.conflicted.length}` : ''}`
       : (st.conflicted.length ? `冲突 ${st.conflicted.length} 个文件` : '');
     sbOp.title = st.in_progress ? '点击前往 Git 工作区处理' : '';
-    sbOp.onclick = st.in_progress || st.conflicted.length ? () => switchView('gitwork', true) : null;
+    sbOp.onclick = st.in_progress || st.conflicted.length ? () => switchView('git', true) : null;
   } catch { /* ignore */ }
 }
 

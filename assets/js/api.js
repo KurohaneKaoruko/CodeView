@@ -49,4 +49,13 @@ export const api = {
   depsGraph: () => fetch('/api/deps/graph').then(handle),
   depsSymbols: (path) => fetch(`/api/deps/symbols?path=${encodeURIComponent(path)}`).then(handle),
   depsRefs: (path, symbol) => fetch(`/api/deps/refs?path=${encodeURIComponent(path)}&symbol=${encodeURIComponent(symbol)}`).then(handle),
+
+  search: (q, cs = false, re = false) =>
+    fetch(`/api/search?q=${encodeURIComponent(q)}&cs=${cs ? 1 : 0}&re=${re ? 1 : 0}`).then(handle),
+
+  aiConfig: () => fetch('/api/ai/config').then(handle),
+  aiSetConfig: (cfg) =>
+    fetch('/api/ai/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) }).then(handle),
+  aiAsk: (payload) =>
+    fetch('/api/ai/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(handle),
 };

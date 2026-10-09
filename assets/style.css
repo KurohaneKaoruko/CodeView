@@ -147,6 +147,20 @@ svg.ic { flex: 0 0 auto; vertical-align: -2px; }
   font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
   position: sticky; top: 0; background: var(--sidebar); z-index: 5;
 }
+.side-tabs {
+  display: flex; gap: 2px; padding: 6px 6px 4px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--sidebar); z-index: 6;
+}
+.side-tab {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  border: 1px solid transparent; background: none; color: var(--fg-dim);
+  padding: 4px 6px; border-radius: 7px; cursor: pointer; font: 11.5px var(--sans);
+  transition: background .12s, color .12s;
+}
+.side-tab:hover { color: var(--fg); background: var(--hover); }
+.side-tab.active { color: var(--fg); background: var(--active); border-color: rgba(91,140,255,.35); }
+.side-host { min-height: 0; }
 .side-head .btns { margin-left: auto; display: flex; gap: 2px; }
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -341,15 +355,136 @@ pre.codeview .line-hl {
 }
 .editor-empty .big { font-size: 40px; opacity: .35; }
 
-/* ================= Git 历史树状图 ================= */
-.log-wrap { flex: 1; display: flex; min-width: 0; flex-direction: column; }
-.log-main { flex: 1; display: flex; min-height: 0; }
+/* ================= 侧栏搜索 ================= */
+.search-results { padding: 0 6px 10px; }
+.search-summary { padding: 4px 8px 6px; color: var(--fg-faint); font-size: 11.5px; }
+.search-group { margin-bottom: 6px; }
+.search-file {
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--fg-dim);
+}
+.search-file:hover { background: var(--hover); }
+.search-file .p { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+.search-file .count { color: var(--fg-faint); font-size: 10.5px; }
+.search-hit {
+  display: flex; gap: 7px; padding: 2px 8px 2px 20px; cursor: pointer;
+  font: 11.5px/1.5 var(--mono); color: var(--fg-dim); border-radius: 5px;
+}
+.search-hit:hover { background: var(--hover); }
+.search-hit .ln { flex: 0 0 34px; text-align: right; color: var(--fg-faint); font-size: 10.5px; }
+.search-hit .tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; user-select: text; }
+.search-hit mark { background: rgba(224,177,62,.35); color: var(--fg); border-radius: 2px; }
+
+/* ================= 侧栏 AI ================= */
+.ai-quick { display: flex; gap: 6px; padding: 10px 10px 4px; flex-wrap: wrap; }
+.ai-cfg { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--panel); }
+.ai-answer { padding: 4px 12px 14px; }
+.ai-answer .md { font-size: 12.5px; line-height: 1.7; color: var(--fg-dim); user-select: text; }
+.ai-answer .md .md-h { color: var(--fg); font-weight: 650; margin: 10px 0 4px; }
+.ai-answer .md .md-p { margin: 4px 0; }
+.ai-answer .md .md-li { display: flex; gap: 6px; margin: 2px 0; }
+.ai-answer .md .bul { color: var(--accent); flex: 0 0 auto; }
+.ai-answer .md b { color: var(--fg); }
+.ai-answer .md code { background: var(--raised); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font: 11.5px var(--mono); color: var(--cyan); }
+.ai-answer .md .md-code {
+  background: #0d0f13; border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 10px; font: 11.5px/1.5 var(--mono); white-space: pre-wrap; color: #9da5b4; overflow-x: auto;
+}
+
+/* ================= Git 管理（历史+工作区合并） ================= */
+.mgmt-wrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.mgmt-main { flex: 1; display: flex; min-height: 0; position: relative; }
+.mgmt-main .graph-pane { flex: 1; }
+.work-panel {
+  flex: 0 0 auto; width: 0; overflow: hidden; background: var(--sidebar);
+  transition: width .18s ease;
+}
+.work-panel.open { width: 330px; border-right: 1px solid var(--border); }
+.work-panel .work-left { flex: none; width: 330px; border-right: none; }
+
+/* 紧凑 SCM 分组列表（VS Code 风格） */
+.scm-group { border-bottom: 1px solid rgba(38, 42, 51, .6); }
+.scm-head {
+  display: flex; align-items: center; gap: 5px; height: 25px; padding: 0 8px;
+  cursor: pointer; color: var(--fg-dim); font-size: 11.5px; font-weight: 600;
+  user-select: none;
+}
+.scm-head:hover { background: var(--hover); }
+.scm-head .caret { display: flex; align-items: center; transition: transform .12s; color: var(--fg-faint); }
+.scm-head .caret.open { transform: rotate(90deg); }
+.scm-head .t { letter-spacing: .3px; }
+.scm-head .count { color: var(--fg-faint); font-size: 10.5px; font-weight: 400; }
+.scm-row {
+  display: flex; align-items: center; gap: 6px; height: 23px; padding: 0 6px 0 20px;
+  font-family: var(--mono); font-size: 12px; color: var(--fg-dim);
+}
+.scm-row:hover { background: var(--hover); }
+.scm-row .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.scm-row .path:hover { color: var(--fg); }
+.scm-row .acts { display: flex; gap: 2px; visibility: hidden; }
+.scm-row:hover .acts { visibility: visible; }
+.scm-commit { padding: 8px 10px; border-bottom: 1px solid rgba(38, 42, 51, .6); }
+.scm-commit textarea { width: 100%; resize: vertical; font-size: 12px; }
+.scm-empty { padding: 3px 10px 5px 22px; color: var(--fg-faint); font-size: 11.5px; }
+.scm-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 15px; height: 15px; border-radius: 8px; padding: 0 4px;
+  background: var(--accent); color: #fff; font-size: 9.5px; font-weight: 700;
+  margin-left: 5px; vertical-align: 1px;
+}
+
+/* 详情抽屉：从右侧滑出 */
+.mgmt-drawer {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 500px;
+  background: var(--panel); border-left: 1px solid var(--border);
+  box-shadow: -18px 0 44px rgba(0, 0, 0, .38);
+  transform: translateX(105%);
+  transition: transform .22s cubic-bezier(.25, .9, .35, 1);
+  display: flex; flex-direction: column;
+  z-index: 20;
+}
+.mgmt-drawer.open { transform: translateX(0); }
+.drawer-h {
+  display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+  background: var(--panel-head); border-bottom: 1px solid var(--border);
+  font-size: 12.5px; flex: 0 0 auto; min-height: 34px;
+}
+.drawer-h .drawer-title { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer-b { overflow: auto; flex: 1; min-height: 0; user-select: text; }
+
+/* 大型视图（横向自由画布） */
+.large-overlay {
+  position: fixed; top: 43px; bottom: 25px; left: 0; right: 0; z-index: 60;
+  background: var(--editor-bg);
+  display: flex; flex-direction: column;
+  animation: fadeIn .15s ease;
+}
+.free-graph { flex: 1; position: relative; overflow: hidden; background: radial-gradient(circle at 20% 20%, #1d222c 0%, #14161b 70%); }
+.free-graph canvas { position: absolute; inset: 0; cursor: grab; }
+.free-graph canvas.panning { cursor: grabbing; }
+.free-graph canvas.node-hover { cursor: pointer; }
+
+/* 提交信息弹窗（大型视图点击节点） */
+.commit-popup {
+  position: fixed; z-index: 90;
+  background: var(--raised); border: 1px solid var(--border-strong); border-radius: 12px;
+  box-shadow: var(--shadow); max-height: 70vh; overflow: hidden auto;
+  animation: pop .15s cubic-bezier(.2, 1.3, .4, 1);
+}
+.commit-popup .card-h { position: sticky; top: 0; z-index: 1; }
+
+/* ================= Git 历史（保留组件样式） ================= */
+.commit-head { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
 .graph-pane {
-  flex: 1; min-width: 0; position: relative; overflow: hidden;
+  flex: 1; min-width: 0; position: relative; overflow-y: auto; overflow-x: hidden;
   background: radial-gradient(circle at 30% 0%, #1c202a 0%, var(--editor-bg) 65%);
 }
-.graph-pane canvas { display: block; width: 100%; height: 100%; cursor: grab; }
-.graph-pane canvas.panning { cursor: grabbing; }
+.gg-content { position: relative; min-height: 100%; }
+.graph-pane canvas {
+  display: block; position: absolute; top: 0; left: 0;
+  cursor: default;
+}
+.graph-pane canvas.node-hover { cursor: pointer; }
 .graph-pane canvas.node-hover { cursor: pointer; }
 .gg-tooltip {
   position: fixed; z-index: 90; pointer-events: none;
@@ -358,11 +493,7 @@ pre.codeview .line-hl {
 }
 .gg-tooltip .t-subject { color: var(--fg); margin-bottom: 2px; }
 .gg-tooltip .t-meta { color: var(--fg-dim); font-size: 11px; }
-.graph-hint {
-  position: absolute; right: 12px; bottom: 10px; z-index: 5;
-  color: var(--fg-faint); font-size: 11px; background: rgba(13, 15, 19, .6);
-  border: 1px solid var(--border); border-radius: 6px; padding: 3px 9px; pointer-events: none; user-select: none;
-}
+.graph-hint { display: none; }
 /* 分支图例 */
 .branch-legend {
   display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--fg-dim);
@@ -370,7 +501,6 @@ pre.codeview .line-hl {
 }
 .branch-legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: -1px; }
 
-.log-list-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
 .view-toolbar {
   display: flex; gap: 8px; align-items: center; padding: 8px 12px;
   border-bottom: 1px solid var(--border); background: var(--titlebar); flex-wrap: wrap;
@@ -380,30 +510,11 @@ pre.codeview .line-hl {
   font-weight: 650; font-size: 13px; display: flex; align-items: center; gap: 8px; margin-right: 6px;
 }
 .view-toolbar .sep { width: 1px; height: 18px; background: var(--border-strong); }
-.log-rows { flex: 1; overflow: auto; position: relative; }
-.log-row {
-  display: flex; align-items: center; height: 34px; cursor: pointer;
-  border-bottom: 1px solid rgba(38, 42, 51, .55); position: relative;
-  transition: background .1s;
-}
-.log-row:hover { background: var(--hover); }
-.log-row.selected { background: var(--active); }
-.log-row.selected::before {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--accent);
-}
-.log-row .cells { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; padding-right: 14px; }
 .avatar {
   width: 20px; height: 20px; border-radius: 50%; flex: 0 0 auto;
   display: flex; align-items: center; justify-content: center;
   font: 10px/1 var(--sans); font-weight: 700; color: #fff;
 }
-.log-row .cell-subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
-.log-row .oid { color: var(--fg-faint); font: 11px var(--mono); }
-.log-row .cell-author { flex: 0 0 96px; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.log-row .cell-time { flex: 0 0 88px; color: var(--fg-faint); font-size: 11.5px; text-align: right; }
-.log-graph { position: sticky; left: 0; z-index: 2; background: var(--editor-bg); flex: 0 0 auto; height: 34px; }
-
-.log-detail { flex: 0 0 440px; background: var(--panel); overflow: auto; }
 .commit-head { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
 .commit-head h3 { margin: 0 0 8px; font-size: 14.5px; line-height: 1.45; user-select: text; }
 .commit-meta { display: flex; align-items: center; gap: 8px; color: var(--fg-dim); font-size: 12px; flex-wrap: wrap; }

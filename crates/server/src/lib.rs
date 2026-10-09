@@ -8,13 +8,15 @@ use axum::http::{header, HeaderValue, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use codeview_core::{deps, fsx, gitread, gitwrite};
+use codeview_core::{deps, fsx, gitread, gitwrite, search};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use tokio::sync::oneshot;
+
+mod ai;
 
 // ---------------- 最近打开的项目 ----------------
 
@@ -171,6 +173,10 @@ async fn static_handler(uri: Uri) -> Response {
         let mut resp = Response::new(Body::from(content.data.to_vec()));
         resp.headers_mut()
             .insert(header::CONTENT_TYPE, HeaderValue::from_static(mime_of(path)));
+        resp.headers_mut().insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        );
         return resp;
     }
     if path.starts_with("api/") {
@@ -606,6 +612,132 @@ async fn git_action(
     .await
 }
 
+// ---------------- 搜索 API ----------------
+
+async fn api_search(
+    State(app): State<std::sync::Arc<App>>,
+    Query(q): Query<HashMap<String, String>>,
+) -> Response {
+    blocking(move || {
+        api_result(|| {
+            with_root(&app, |root| {
+                let query = q.get("q").cloned().unwrap_or_default();
+                let cs = q.get("cs").map(|v| v == "1" || v == "true").unwrap_or(false);
+                let rx = q.get("re").map(|v| v == "1" || v == "true").unwrap_or(false);
+                search::search(root, &query, cs, rx)
+            })
+        })
+    })
+    .await
+}
+
+// ---------------- AI API ----------------
+
+async fn ai_get_config() -> Response {
+    Json(ai::public_config(&ai::load_config())).into_response()
+}
+
+#[derive(Deserialize)]
+struct AiConfigReq {
+    base_url: String,
+    model: String,
+    #[serde(default)]
+    api_key: String,
+}
+
+async fn ai_set_config(Json(req): Json<AiConfigReq>) -> Response {
+    let mut cfg = ai::load_config();
+    cfg.base_url = req.base_url.trim().to_string();
+    cfg.model = req.model.trim().to_string();
+    if !req.api_key.trim().is_empty() {
+        cfg.api_key = req.api_key.trim().to_string();
+    }
+    match ai::save_config(&cfg) {
+        Ok(()) => Json(ai::public_config(&cfg)).into_response(),
+        Err(e) => json_err(format!("保存配置失败: {e:#}")),
+    }
+}
+
+async fn ai_ask(State(app): State<std::sync::Arc<App>>, Json(req): Json<ai::AskReq>) -> Response {
+    blocking(move || {
+        api_result(|| {
+            with_root(&app, |root| {
+                let tree = if req.include_tree { Some(collect_tree(root)) } else { None };
+                let git = if req.include_git { collect_git(root) } else { None };
+                let answer = ai::ask(&req, tree, git)?;
+                Ok(json!({ "answer": answer }))
+            })
+        })
+    })
+    .await
+}
+
+/// 收集项目结构（前两层目录 + 文件数）
+fn collect_tree(root: &Path) -> String {
+    use std::collections::BTreeMap;
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .build();
+    let mut dirs: BTreeMap<String, usize> = BTreeMap::new();
+    let mut files: Vec<String> = Vec::new();
+    for e in walker.flatten() {
+        if !e.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            continue;
+        }
+        let rel = match e.path().strip_prefix(root) {
+            Ok(r) => r.to_string_lossy().replace('\\', "/"),
+            Err(_) => continue,
+        };
+        let parts: Vec<&str> = rel.split('/').collect();
+        if parts.len() <= 1 {
+            files.push(rel);
+        } else {
+            *dirs.entry(format!("{}/", parts[..parts.len() - 1].join("/"))).or_default() += 1;
+            if files.len() < 400 {
+                files.push(rel);
+            }
+        }
+        if dirs.len() + files.len() > 600 {
+            break;
+        }
+    }
+    let mut out = String::new();
+    for (d, n) in dirs.iter().take(150) {
+        out.push_str(&format!("{d}  ({n} 个文件)\n"));
+    }
+    for f in files.iter().take(400) {
+        out.push_str(f);
+        out.push('\n');
+    }
+    out
+}
+
+/// 收集 git 摘要：当前分支、状态统计、最近 30 条提交
+fn collect_git(root: &Path) -> Option<String> {
+    let repo = gitread::open(root).ok()?;
+    let st = gitread::status(&repo).ok()?;
+    let refs = gitread::refs(&repo).ok()?;
+    let log = gitread::log(&repo, 30, 0, None).unwrap_or_default();
+    let mut out = String::new();
+    out.push_str(&format!(
+        "当前分支: {}\n",
+        st.head_branch.clone().unwrap_or_else(|| "(detached)".into())
+    ));
+    out.push_str(&format!(
+        "变更: 暂存 {} / 未暂存 {} / 未跟踪 {}\n",
+        st.staged.len(),
+        st.unstaged.len(),
+        st.untracked.len()
+    ));
+    out.push_str(&format!("分支数: {}\n最近提交:\n", refs.locals.len()));
+    for c in log.iter() {
+        out.push_str(&format!("{} {}", &c.oid[..7.min(c.oid.len())], c.subject));
+        out.push('\n');
+    }
+    Some(out)
+}
+
 // ---------------- 依赖分析 API ----------------
 
 async fn deps_graph(State(app): State<std::sync::Arc<App>>) -> Response {
@@ -668,6 +800,9 @@ fn router(app: std::sync::Arc<App>) -> Router {
         .route("/api/deps/graph", get(deps_graph))
         .route("/api/deps/symbols", get(deps_symbols))
         .route("/api/deps/refs", get(deps_refs))
+        .route("/api/search", get(api_search))
+        .route("/api/ai/config", get(ai_get_config).post(ai_set_config))
+        .route("/api/ai/ask", post(ai_ask))
         .fallback(static_handler)
         .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
         .with_state(app)
