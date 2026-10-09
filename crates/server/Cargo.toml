@@ -15,6 +15,7 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 ignore.workspace = true
+rfd = "0.15"
 rust-embed = "8"
 open = "5"
 ureq = { version = "2", features = ["json"] }

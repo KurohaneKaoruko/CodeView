@@ -15,7 +15,6 @@ fn main() {
         .unwrap_or_else(|| std::path::PathBuf::from("."));
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             let root = root.clone();
             let (tx, rx) = std::sync::mpsc::channel::<u16>();

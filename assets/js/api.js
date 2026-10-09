@@ -53,6 +53,8 @@ export const api = {
   search: (q, cs = false, re = false) =>
     fetch(`/api/search?q=${encodeURIComponent(q)}&cs=${cs ? 1 : 0}&re=${re ? 1 : 0}`).then(handle),
 
+  pickDir: () => fetch('/api/pick_dir').then(handle),
+
   aiConfig: () => fetch('/api/ai/config').then(handle),
   aiSetConfig: (cfg) =>
     fetch('/api/ai/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) }).then(handle),

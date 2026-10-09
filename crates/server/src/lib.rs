@@ -773,6 +773,25 @@ async fn api_open_native(Query(q): Query<HashMap<String, String>>) -> Response {
     }
 }
 
+// ---------------- 系统目录选择（原生对话框） ----------------
+
+/// 弹出操作系统原生的目录选择对话框（rfd），返回用户选择的路径。
+async fn api_pick_dir() -> Response {
+    blocking(move || {
+        api_result(|| {
+            let picked = blocking_pick_folder();
+            Ok(json!({ "path": picked.map(|p| clean_path(&p)) }))
+        })
+    })
+    .await
+}
+
+fn blocking_pick_folder() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("选择项目目录")
+        .pick_folder()
+}
+
 // ---------------- 依赖分析 API ----------------
 
 async fn deps_graph(State(app): State<std::sync::Arc<App>>) -> Response {
@@ -819,6 +838,7 @@ fn router(app: std::sync::Arc<App>) -> Router {
         .route("/api/recent", get(recent))
         .route("/api/browse", get(browse))
         .route("/api/open_native", get(api_open_native))
+        .route("/api/pick_dir", get(api_pick_dir))
         .route("/api/tree", get(tree))
         .route("/api/file", get(get_file).put(put_file))
         .route("/api/file/delete", post(delete_file))
