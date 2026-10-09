@@ -1,7 +1,6 @@
 // CodeView 前端入口
 import { api } from './api.js?v=3';
-import { el, icon, toast, errToast } from './ui.js?v=3';
-import { initPathDrop, isDesktop } from './pathdrop.js?v=3';
+import { el, icon, toast, errToast } from './ui.js?v=3';import { initPathDrop } from './pathdrop.js?v=3';
 import { hideGraphTooltip } from './gitgraph.js?v=3';
 import * as files from './views/files.js?v=3';
 import * as editor from './views/editor.js?v=3';
@@ -153,29 +152,38 @@ initPathDrop(document.getElementById('root-input'), {
   onOpen: (p) => openProject(p),
 });
 
-// ---- 桌面端：无边框窗口的自绘标题栏（拖拽区 + 窗口按钮） ----
+// ---- 桌面端：无边框窗口的自绘标题栏（经服务端转发窗口动作） ----
 function setupDesktopChrome() {
-  if (!isDesktop()) return;
   document.body.classList.add('desktop');
   const top = document.getElementById('topbar');
-  const win = window.__TAURI__.window.getCurrent();
+  const winAction = (action) => fetch('/api/desktop/win', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  }).catch(() => {});
   // 拖拽区（品牌区与空白延伸区）
-  top.querySelector('.brand')?.setAttribute('data-tauri-drag-region', '');
-  top.querySelector('.spacer')?.setAttribute('data-tauri-drag-region', '');
+  top.querySelector('.brand')?.setAttribute('data-drag', '');
+  top.querySelector('.spacer')?.setAttribute('data-drag', '');
   const mk = (cls, label, fn) => el('button', {
     class: `win-ctl ${cls}`,
     title: label,
     onclick: (e) => { e.stopPropagation(); fn(); },
   }, label);
   top.append(el('span', { class: 'win-ctls' },
-    mk('min', '最小化', () => win.minimize()),
-    mk('max', '最大化 / 还原', () => win.toggleMaximize()),
-    mk('close', '关闭', () => win.close()),
+    mk('min', '最小化', () => winAction('minimize')),
+    mk('max', '最大化 / 还原', () => winAction('maximize')),
+    mk('close', '关闭', () => winAction('close')),
   ));
+  // 按住拖拽区 → 后端进入窗口拖拽循环
+  top.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('button, input, select, textarea, .path-box, .win-ctl')) return;
+    if (e.target.closest('[data-drag]')) winAction('drag');
+  });
   // 双击拖拽区最大化/还原
   top.addEventListener('dblclick', (e) => {
     if (e.target.closest('button, input, select, textarea, .path-box, .win-ctl')) return;
-    win.toggleMaximize();
+    winAction('maximize');
   });
 }
 setupDesktopChrome();

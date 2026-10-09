@@ -17,6 +17,26 @@ fn main() {
     tauri::Builder::default()
         .setup(move |app| {
             let root = root.clone();
+            let handle = app.handle().clone();
+            // 窗口动作经服务端 HTTP 转发到 AppHandle（拖拽/最小化/最大化/关闭）
+            let wa: codeview_server::WindowActionFn = std::sync::Arc::new(move |action| {
+                let handle = handle.clone();
+                let action = action.to_string();
+                std::thread::spawn(move || {
+                    if let Some(win) = handle.get_webview_window("main") {
+                        match action.as_str() {
+                            "minimize" => { let _ = win.minimize(); }
+                            "maximize" => {
+                                if win.is_maximized().unwrap_or(false) { let _ = win.unmaximize(); }
+                                else { let _ = win.maximize(); }
+                            }
+                            "close" => { let _ = win.close(); }
+                            "drag" => { let _ = win.start_dragging(); }
+                            _ => {}
+                        }
+                    }
+                });
+            });
             let (tx, rx) = std::sync::mpsc::channel::<u16>();
             std::thread::spawn(move || {
                 let rt = tokio::runtime::Builder::new_multi_thread()
@@ -24,7 +44,7 @@ fn main() {
                     .build()
                     .expect("tokio runtime");
                 let actual = rt
-                    .block_on(codeview_server::start_server(root, 0))
+                    .block_on(codeview_server::start_server(root, 0, true, Some(wa)))
                     .expect("启动内嵌服务失败");
                 let _ = tx.send(actual);
                 // 保持 runtime 存活

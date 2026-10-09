@@ -162,7 +162,7 @@ fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    let actual = rt.block_on(codeview_server::start_server(root.clone(), port))?;
+    let actual = rt.block_on(codeview_server::start_server(root.clone(), port, false, None))?;
     let url = format!("http://127.0.0.1:{actual}/");
     println!("CodeView 已启动: {url}");
     println!("项目: {}", root.display());

@@ -219,8 +219,13 @@ fn percent_decode(s: &str) -> String {
 
 // ---------------- 应用状态 ----------------
 
+/// 窗口动作回调（桌面端注入，Web 端为 None）
+pub type WindowActionFn = std::sync::Arc<dyn Fn(&str) + Send + Sync>;
+
 struct App {
     root: RwLock<PathBuf>,
+    desktop: bool,
+    window_action: Option<WindowActionFn>,
 }
 
 fn with_root<T>(app: &App, f: impl FnOnce(&Path) -> Result<T>) -> Result<T> {
@@ -246,6 +251,7 @@ struct Overview {
     root: String,
     name: String,
     is_git: bool,
+    desktop: bool,
 }
 
 fn json_err(msg: String) -> Response {
@@ -272,6 +278,7 @@ async fn overview(State(app): State<std::sync::Arc<App>>) -> Response {
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| root.to_string_lossy().to_string()),
         is_git,
+        desktop: app.desktop,
     })
     .into_response()
 }
@@ -792,6 +799,21 @@ fn blocking_pick_folder() -> Option<PathBuf> {
         .pick_folder()
 }
 
+// ---------------- 桌面窗口控制（经服务端转发到 AppHandle） ----------------
+
+#[derive(Deserialize)]
+struct WinActionReq {
+    action: String,
+}
+
+async fn desktop_win(State(app): State<std::sync::Arc<App>>, Json(req): Json<WinActionReq>) -> Response {
+    let Some(f) = app.window_action.clone() else {
+        return json_err("非桌面模式".into());
+    };
+    f(&req.action);
+    Json(json!({ "ok": true })).into_response()
+}
+
 // ---------------- 依赖分析 API ----------------
 
 async fn deps_graph(State(app): State<std::sync::Arc<App>>) -> Response {
@@ -839,6 +861,7 @@ fn router(app: std::sync::Arc<App>) -> Router {
         .route("/api/browse", get(browse))
         .route("/api/open_native", get(api_open_native))
         .route("/api/pick_dir", get(api_pick_dir))
+        .route("/api/desktop/win", post(desktop_win))
         .route("/api/tree", get(tree))
         .route("/api/file", get(get_file).put(put_file))
         .route("/api/file/delete", post(delete_file))
@@ -865,10 +888,17 @@ fn router(app: std::sync::Arc<App>) -> Router {
 }
 
 /// 绑定端口并以后台任务方式启动 HTTP 服务，返回实际端口。
-pub async fn start_server(root: PathBuf, port: u16) -> Result<u16> {
+pub async fn start_server(
+    root: PathBuf,
+    port: u16,
+    desktop: bool,
+    window_action: Option<WindowActionFn>,
+) -> Result<u16> {
     record_recent(&clean_path(&root));
     let app_state = std::sync::Arc::new(App {
         root: RwLock::new(root),
+        desktop,
+        window_action,
     });
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await;
     let listener = match listener {

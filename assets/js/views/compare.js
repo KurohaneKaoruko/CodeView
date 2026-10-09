@@ -67,7 +67,7 @@ export function render(content) {
     setTimeout(() => document.addEventListener('mousedown', (e) => {
       if (!wrap.contains(e.target)) drop.style.display = 'none';
     }, true), 0);
-    return { input, refreshDrop };
+    return { el: wrap, input, refreshDrop };
   }
 
   const comboA = makeRefCombo('A：分支 / 标签 / commit id', prefill.a || '');
@@ -87,19 +87,19 @@ export function render(content) {
   const toolbar = el('div', { class: 'view-toolbar' },
     el('span', { class: 'vtitle' }, icon('compare', 15), '对比'),
     el('span', { class: 'sep' }),
-    inputA,
+    comboA.el,
     el('button', {
       class: 'btn ghost mini', title: '交换 A / B',
       onclick: () => { const t = inputA.value; inputA.value = inputB.value; inputB.value = t; if (state.result) doCompare(); },
     }, icon('swap', 13)),
-    inputB,
+    comboB.el,
     el('label', { class: 'm-check', title: '以两个引用的共同祖先（merge-base）为基准，效果类似 GitHub PR 的三点对比' },
       mbCheck, el('span', {}, '以共同祖先为基准')),
     el('button', { class: 'btn primary mini', onclick: doCompare }, icon('compare', 12), '对比'),
     statsSpan,
     el('span', { style: { flex: 1 } }),
   );
-  wrap.append(toolbar, datalist);
+  wrap.append(toolbar);
 
   // ---- 主体 ----
   const body = el('div', { class: 'work-body' });
