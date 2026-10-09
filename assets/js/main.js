@@ -186,7 +186,6 @@ function setupDesktopChrome() {
     winAction('maximize');
   });
 }
-setupDesktopChrome();
 
 // ---- 状态栏 ----
 async function refreshStatusbar() {
