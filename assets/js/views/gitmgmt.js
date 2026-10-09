@@ -49,9 +49,9 @@ export function render(content) {
   }, icon('maximize', 13), '大型视图');
   // 工作面板开关（默认收起，从左侧展开）
   const workToggle = el('button', {
-    class: 'btn ghost mini', title: '工作区（更改与提交）',
+    class: 'btn ghost mini', title: '更改面板（提交 / 暂存 / 分支）',
     onclick: () => { state.workOpen = !state.workOpen; layoutWork(); },
-  }, icon('panel-left', 13), '工作区', el('span', { class: 'scm-badge', id: 'work-badge', style: { display: 'none' } }, '0'));
+  }, icon('panel-left', 13), '更改', el('span', { class: 'scm-badge', id: 'work-badge', style: { display: 'none' } }, '0'));
   const toolbar = el('div', { class: 'view-toolbar' },
     workToggle,
     el('span', { class: 'sep' }),
@@ -85,10 +85,7 @@ export function render(content) {
     onNodeClick: (row) => { state.selected = row.oid; showCommitDetail(row); },
     onNodeMenu: (row, x, y) => nodeMenu(row, x, y, 'normal'),
   });
-  main.append(graphPane);
-
   const workPanel = el('div', { class: 'work-panel' });
-  main.append(workPanel);
 
   // 抽屉（从右侧滑出的详情 / diff）
   const drawer = el('div', { class: 'mgmt-drawer' },
@@ -97,6 +94,11 @@ export function render(content) {
       el('span', { style: { flex: 1 } }),
       el('button', { class: 'btn mini ghost', onclick: closeDrawer }, icon('x', 12), '关闭')),
     el('div', { class: 'drawer-b' }));
+
+  // 布局：工作面板在左，图在右，抽屉覆盖在右侧
+  main.append(workPanel);
+  main.append(graphPane);
+  main.append(drawer);
   main.append(drawer);
 
   function openDrawer(title, build) {

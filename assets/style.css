@@ -482,7 +482,7 @@ pre.codeview .line-hl {
   transition: width .18s ease;
 }
 .work-panel.open { width: 330px; border-right: 1px solid var(--border); }
-.work-panel .work-left { flex: none; width: 330px; border-right: none; }
+.work-panel .work-left { flex: none; width: 330px; }
 
 /* 紧凑 SCM 分组列表（VS Code 风格） */
 .scm-group { border-bottom: 1px solid rgba(38, 42, 51, .6); }
@@ -519,7 +519,6 @@ pre.codeview .line-hl {
 .mgmt-drawer {
   position: absolute; top: 0; right: 0; bottom: 0; width: 500px;
   background: var(--panel); border-left: 1px solid var(--border);
-  box-shadow: -18px 0 44px rgba(0, 0, 0, .38);
   transform: translateX(105%);
   transition: transform .22s cubic-bezier(.25, .9, .35, 1);
   display: flex; flex-direction: column;
