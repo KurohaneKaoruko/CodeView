@@ -30,6 +30,7 @@ pub struct RefsInfo {
     pub head_oid: Option<String>,
     pub detached: bool,
     pub locals: Vec<BranchInfo>,
+    pub remote_branches: Vec<BranchInfo>,
     pub tags: Vec<TagInfo>,
     pub remotes: Vec<String>,
 }
@@ -166,6 +167,14 @@ fn collect_refs(repo: &Repository) -> Result<(BTreeMap<String, Vec<RefLabel>>, R
                 continue;
             }
             if let Some(oid) = b.0.get().target() {
+                info.remote_branches.push(BranchInfo {
+                    name: name.clone(),
+                    oid: Some(oid_str(oid)),
+                    is_head: false,
+                    upstream: None,
+                    ahead: None,
+                    behind: None,
+                });
                 map.entry(oid_str(oid)).or_default().push(RefLabel {
                     name,
                     kind: "remote".into(),
@@ -391,35 +400,8 @@ fn change_letter(d: Delta) -> &'static str {
     }
 }
 
-/// 提交详情：相对第一父提交的变更文件列表与逐文件 patch。
-pub fn commit_detail(repo: &Repository, oid_str_param: &str) -> Result<CommitDetail> {
-    let oid = git2::Oid::from_str(oid_str_param)?;
-    let commit = repo.find_commit(oid)?;
-    let sig = commit.author();
-
-    // CommitInfo（含引用标记）
-    let (refmap, _) = collect_refs(repo)?;
-    let info = CommitInfo {
-        oid: oid_str(oid),
-        parents: (0..commit.parent_count())
-            .filter_map(|i| commit.parent_id(i).ok().map(oid_str))
-            .collect(),
-        author: sig.name().unwrap_or("?").to_string(),
-        email: sig.email().unwrap_or("").to_string(),
-        time: commit.time().seconds(),
-        subject: commit.summary().unwrap_or("").to_string(),
-        refs: refmap.get(&oid_str(oid)).cloned().unwrap_or_default(),
-    };
-
-    let mut opts = DiffOptions::new();
-    opts.context_lines(6);
-    let diff = if commit.parent_count() == 0 {
-        repo.diff_tree_to_tree(None, Some(&commit.tree()?), Some(&mut opts))?
-    } else {
-        let parent_tree = commit.parent(0)?.tree()?;
-        repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit.tree()?), Some(&mut opts))?
-    };
-
+/// 从 diff 中提取逐文件 patch 与增删统计。
+fn files_from_diff(diff: &git2::Diff) -> Result<(Vec<CommitFile>, u32, u32)> {
     let stats = diff.stats()?;
     let mut files: Vec<CommitFile> = Vec::new();
     let delta_count = diff.deltas().count();
@@ -463,7 +445,11 @@ pub fn commit_detail(repo: &Repository, oid_str_param: &str) -> Result<CommitDet
         if let Some(i) = current {
             let buf = &mut patches[i];
             match line.origin() {
-                'F' | 'H' => {}
+                'F' => {} // 文件头不需要
+                'H' => {
+                    // hunk 头（@@ -a,b +c,d @@）：前端解析行号需要
+                    buf.push_str(&String::from_utf8_lossy(line.content()));
+                }
                 o @ ('+' | '-' | ' ') => {
                     buf.push(o);
                     buf.push_str(&String::from_utf8_lossy(line.content()));
@@ -481,11 +467,92 @@ pub fn commit_detail(repo: &Repository, oid_str_param: &str) -> Result<CommitDet
         f.additions = f.patch.lines().filter(|l| l.starts_with('+') && !l.starts_with("+++")).count() as u32;
         f.deletions = f.patch.lines().filter(|l| l.starts_with('-') && !l.starts_with("---")).count() as u32;
     }
+    Ok((files, stats.insertions() as u32, stats.deletions() as u32))
+}
+
+/// 提交详情：相对第一父提交的变更文件列表与逐文件 patch。
+pub fn commit_detail(repo: &Repository, oid_str_param: &str) -> Result<CommitDetail> {
+    let oid = git2::Oid::from_str(oid_str_param)?;
+    let commit = repo.find_commit(oid)?;
+    let sig = commit.author();
+
+    // CommitInfo（含引用标记）
+    let (refmap, _) = collect_refs(repo)?;
+    let info = CommitInfo {
+        oid: oid_str(oid),
+        parents: (0..commit.parent_count())
+            .filter_map(|i| commit.parent_id(i).ok().map(oid_str))
+            .collect(),
+        author: sig.name().unwrap_or("?").to_string(),
+        email: sig.email().unwrap_or("").to_string(),
+        time: commit.time().seconds(),
+        subject: commit.summary().unwrap_or("").to_string(),
+        refs: refmap.get(&oid_str(oid)).cloned().unwrap_or_default(),
+    };
+
+    let mut opts = DiffOptions::new();
+    opts.context_lines(6);
+    let diff = if commit.parent_count() == 0 {
+        repo.diff_tree_to_tree(None, Some(&commit.tree()?), Some(&mut opts))?
+    } else {
+        let parent_tree = commit.parent(0)?.tree()?;
+        repo.diff_tree_to_tree(Some(&parent_tree), Some(&commit.tree()?), Some(&mut opts))?
+    };
+
+    let (files, insertions, deletions) = files_from_diff(&diff)?;
 
     Ok(CommitDetail {
         commit: info,
         files,
-        insertions: stats.insertions() as u32,
-        deletions: stats.deletions() as u32,
+        insertions,
+        deletions,
+    })
+}
+
+#[derive(Serialize)]
+pub struct CompareResult {
+    pub from_oid: String,
+    pub to_oid: String,
+    pub base_oid: Option<String>, // merge-base（启用且存在时）
+    pub ahead: i64,               // TO 相对 FROM 领先的提交数
+    pub behind: i64,              // TO 相对 FROM 落后的提交数
+    pub insertions: u32,
+    pub deletions: u32,
+    pub files: Vec<CommitFile>,
+}
+
+/// 对比两个引用（分支/标签/commit id）：树对树的完整差异。
+pub fn compare(repo: &Repository, from: &str, to: &str, use_merge_base: bool) -> Result<CompareResult> {
+    let from_c = repo.revparse_single(from)?.peel_to_commit()?;
+    let to_c = repo.revparse_single(to)?.peel_to_commit()?;
+
+    let mut base_oid = None;
+    let from_tree_c = if use_merge_base {
+        match repo.merge_base(from_c.id(), to_c.id()).ok().and_then(|o| repo.find_commit(o).ok()) {
+            Some(base) => {
+                base_oid = Some(oid_str(base.id()));
+                base
+            }
+            None => from_c.clone(),
+        }
+    } else {
+        from_c.clone()
+    };
+
+    let mut opts = DiffOptions::new();
+    opts.context_lines(4);
+    let diff = repo.diff_tree_to_tree(Some(&from_tree_c.tree()?), Some(&to_c.tree()?), Some(&mut opts))?;
+    let (files, insertions, deletions) = files_from_diff(&diff)?;
+    let (ahead, behind) = repo.graph_ahead_behind(to_c.id(), from_c.id()).unwrap_or((0, 0));
+
+    Ok(CompareResult {
+        from_oid: oid_str(from_c.id()),
+        to_oid: oid_str(to_c.id()),
+        base_oid,
+        ahead: ahead as i64,
+        behind: behind as i64,
+        insertions,
+        deletions,
+        files,
     })
 }

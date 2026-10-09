@@ -32,6 +32,8 @@ const ICONS = {
   reset: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
   play: '<path d="m5 3 14 9-14 9V3z"/>',
   cherry: '<circle cx="12" cy="13" r="8"/><path d="M12 5V3"/><path d="M5 3h14"/>',
+  compare: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/>',
+  swap: '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
   dots: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   disc: '<circle cx="12" cy="12" r="9"/>',
   terminal: '<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>',
@@ -214,4 +216,60 @@ export function avatar(name, size = 20) {
   const d = el('div', { class: 'avatar', title: name, style: { width: `${size}px`, height: `${size}px`, background: avatarColor(name) } },
     (name || '?').trim().charAt(0).toUpperCase());
   return d;
+}
+
+// ---- 带行号的 diff 渲染 ----
+// 解析 unified patch：@@ -a,b +c,d @@ 头跟踪新旧行号；点击行可回调（跳转到工作区文件）。
+export function renderDiffRows(patch, opts = {}) {
+  const MAX_ROWS = 6000;
+  const grid = el('div', { class: 'diffgrid' });
+  if (!patch || !patch.trim()) {
+    grid.append(el('div', { class: 'diff-note' }, '（二进制文件或无文本差异）'));
+    return grid;
+  }
+  let oldNo = 0, newNo = 0, count = 0, truncated = false;
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const row = (no1, no2, cls, text, clickableLine) => {
+    const code = el('span', { class: 'code' });
+    code.innerHTML = esc(text) || '&nbsp;';
+    const r = el('div', { class: `dlrow ${cls}${clickableLine != null ? ' clickable' : ''}` },
+      el('span', { class: 'no' }, no1 != null ? String(no1) : ''),
+      el('span', { class: 'no' }, no2 != null ? String(no2) : ''),
+      code,
+    );
+    if (clickableLine != null && opts.onOpenLine) {
+      r.addEventListener('click', () => opts.onOpenLine(clickableLine));
+    }
+    return r;
+  };
+  for (const raw of patch.split('\n')) {
+    if (count++ > MAX_ROWS) { truncated = true; break; }
+    if (raw.startsWith('@@')) {
+      const m = raw.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (m) { oldNo = parseInt(m[1], 10); newNo = parseInt(m[2], 10); }
+      grid.append(el('div', { class: 'dlrow hunk' }, raw));
+      continue;
+    }
+    if (/^(diff |index |--- |\+\+\+ |new file mode|old file mode|deleted file mode|similarity index|rename from|rename to|mode )/.test(raw)
+      || raw.startsWith('\\ No newline')) {
+      grid.append(el('div', { class: 'dlrow meta' }, raw));
+      continue;
+    }
+    if (raw.startsWith('+')) {
+      grid.append(row(null, newNo, 'add', raw.slice(1), newNo));
+      newNo++;
+    } else if (raw.startsWith('-')) {
+      grid.append(row(oldNo, null, 'del', raw.slice(1), null));
+      oldNo++;
+    } else {
+      const text = raw.startsWith(' ') ? raw.slice(1) : raw;
+      grid.append(row(oldNo, newNo, 'ctx', text, newNo));
+      oldNo++; newNo++;
+    }
+  }
+  if (truncated) grid.append(el('div', { class: 'diff-note' }, '…内容过长，已截断显示'));
+  if (opts.onOpenLine) {
+    grid.append(el('div', { class: 'diff-note' }, '提示：点击任意行可跳转到工作区文件的对应行'));
+  }
+  return grid;
 }

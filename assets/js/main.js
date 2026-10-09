@@ -5,6 +5,7 @@ import * as files from './views/files.js';
 import * as editor from './views/editor.js';
 import * as gitlog from './views/gitlog.js';
 import * as gitwork from './views/gitwork.js';
+import * as compare from './views/compare.js';
 import * as deps from './views/deps.js';
 
 const S = { overview: null, view: 'files' };
@@ -13,7 +14,7 @@ const side = document.getElementById('side');
 const content = document.getElementById('content');
 
 // 活动栏图标
-const ACT_ICONS = { files: 'code', gitlog: 'history', gitwork: 'branch', deps: 'package' };
+const ACT_ICONS = { files: 'code', gitlog: 'history', gitwork: 'branch', compare: 'compare', deps: 'package' };
 document.querySelectorAll('.act-btn').forEach((b) => {
   b.append(icon(ACT_ICONS[b.dataset.view], 20));
   b.addEventListener('click', () => switchView(b.dataset.view));
@@ -52,6 +53,9 @@ window.CodeView = {
   refreshStatusbar,
   fileRenamed: editor.fileRenamed,
   fileDeleted: editor.fileDeleted,
+  openFileAt: editor.openFileAt,
+  setCompareA: (oid) => { window.__cmpPrefill = { a: oid }; switchView('compare'); },
+  setCompareB: (oid) => { window.__cmpPrefill = { b: oid }; switchView('compare'); },
   _workRefresh: null,
 };
 
@@ -78,6 +82,7 @@ function switchView(view) {
     content.append(holder);
     if (view === 'gitlog') gitlog.render(holder);
     else if (view === 'gitwork') gitwork.render(holder);
+    else if (view === 'compare') compare.render(holder);
     else if (view === 'deps') deps.render(holder);
   }
 }

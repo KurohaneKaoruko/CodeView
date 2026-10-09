@@ -314,6 +314,27 @@ async fn git_commit_detail(
     .await
 }
 
+async fn git_compare(
+    State(app): State<std::sync::Arc<App>>,
+    Query(q): Query<HashMap<String, String>>,
+) -> Response {
+    blocking(move || {
+        api_result(|| {
+            with_root(&app, |root| {
+                let repo = gitread::open(root)?;
+                let from = q.get("from").cloned().unwrap_or_default();
+                let to = q.get("to").cloned().unwrap_or_default();
+                if from.is_empty() || to.is_empty() {
+                    bail!("from 与 to 不能为空");
+                }
+                let mb = q.get("mb").map(|v| v == "1" || v == "true").unwrap_or(false);
+                gitread::compare(&repo, &from, &to, mb)
+            })
+        })
+    })
+    .await
+}
+
 #[derive(Deserialize)]
 struct PathsReq {
     #[serde(default)]
@@ -514,6 +535,7 @@ fn router(app: std::sync::Arc<App>) -> Router {
         .route("/api/git/refs", get(git_refs))
         .route("/api/git/log", get(git_log))
         .route("/api/git/file_diff", get(git_file_diff))
+        .route("/api/git/compare", get(git_compare))
         .route("/api/git/stage", post(git_stage))
         .route("/api/git/unstage", post(git_unstage))
         .route("/api/git/commit", get(git_commit_detail).post(git_commit))

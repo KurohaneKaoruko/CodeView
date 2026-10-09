@@ -7,6 +7,7 @@ const tabs = [];
 let activePath = null;
 let container = null;
 let dirtyListener = null;
+let pendingLine = null;
 
 export function init(parent) {
   container = el('div', { class: 'editor-wrap' });
@@ -38,6 +39,12 @@ export function openFile(path) {
     activePath = path;
     render();
   }).catch(errToast);
+}
+
+/** 打开文件并跳转到指定行（阅读模式下高亮该行） */
+export function openFileAt(path, line) {
+  pendingLine = line;
+  openFile(path);
 }
 
 export function fileRenamed(from, to) {
@@ -200,7 +207,19 @@ function render() {
     const gutter = el('div', { class: 'gutter', style: { overflow: 'hidden' } }, gutterInner);
     const scroll = el('div', { class: 'code-scroll' });
     const pre = el('pre', { class: 'codeview' });
-    pre.innerHTML = highlight(cur.content, cur.lang);
+    let html = highlight(cur.content, cur.lang);
+    if (pendingLine != null) {
+      const lines = html.split('\n');
+      const i = pendingLine - 1;
+      if (i >= 0 && i < lines.length) {
+        lines[i] = `<span class="line-hl">${lines[i] || ' '}</span>`;
+        html = lines.join('\n');
+        const target = pendingLine;
+        setTimeout(() => { scroll.scrollTop = Math.max(0, (target - 4) * lineHeight); }, 0);
+      }
+      pendingLine = null;
+    }
+    pre.innerHTML = html;
     scroll.append(pre);
     scroll.addEventListener('scroll', () => { gutterInner.style.transform = `translateY(${-scroll.scrollTop}px)`; });
     body.append(gutter, scroll);

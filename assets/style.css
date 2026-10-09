@@ -305,6 +305,11 @@ pre.codeview .t { color: #79c0ff; }
 pre.codeview .f { color: #d2a8ff; }
 pre.codeview .a { color: #f08d3e; }
 pre.codeview .p { color: #8b93a1; }
+pre.codeview .line-hl {
+  display: inline-block; min-width: 100%;
+  background: rgba(224, 177, 62, .22);
+  box-shadow: inset 2px 0 0 var(--yellow);
+}
 .editor-empty {
   flex: 1; display: flex; flex-direction: column; gap: 10px;
   align-items: center; justify-content: center; color: var(--fg-faint);
@@ -357,18 +362,41 @@ pre.codeview .p { color: #8b93a1; }
 }
 .commit-meta .oidbox:hover { color: var(--fg); border-color: var(--accent); }
 .detail-files { padding: 6px 8px; }
-.diff-box { margin: 10px 14px 14px; border: 1px solid var(--border); border-radius: 8px; overflow: auto; max-height: 52vh; user-select: text; }
-.diff-box pre { margin: 0; font: 12px/1.55 var(--mono); padding: 6px 0; white-space: pre; }
-.dl-add { background: rgba(78, 201, 106, .12); color: #86d98c; display: block; }
-.dl-del { background: rgba(244, 112, 103, .12); color: #ffa198; display: block; }
-.dl-hunk { color: var(--accent); background: var(--accent-soft); display: block; }
-.dl-meta { color: var(--fg-faint); display: block; }
+/* 带行号的 diff 网格 */
+.diffgrid { font: 12px/1.6 var(--mono); user-select: text; padding: 6px 0; }
+.dlrow { display: flex; min-height: 19px; }
+.dlrow .no {
+  flex: 0 0 44px; text-align: right; padding: 0 7px;
+  color: var(--fg-faint); user-select: none; font-size: 10.5px; line-height: 19px;
+}
+.dlrow .code { flex: 1; white-space: pre-wrap; word-break: break-all; padding-right: 12px; }
+.dlrow.add { background: rgba(78, 201, 106, .1); }
+.dlrow.add .code { color: #86d98c; }
+.dlrow.add .no:last-child { color: var(--green); }
+.dlrow.del { background: rgba(244, 112, 103, .1); }
+.dlrow.del .code { color: #ffa198; }
+.dlrow.del .no:first-child { color: var(--red); }
+.dlrow.ctx .code { color: var(--fg-dim); }
+.dlrow.hunk {
+  color: var(--accent); background: var(--accent-soft);
+  padding: 1px 10px; margin: 3px 0; border-radius: 4px;
+}
+.dlrow.meta { color: var(--fg-faint); padding: 0 10px; }
+.dlrow.clickable { cursor: pointer; }
+.dlrow.clickable:hover { filter: brightness(1.35); background: var(--hover); }
+.diff-note { padding: 4px 12px; color: var(--fg-faint); font-size: 11px; font-family: var(--sans); }
 .detail-file {
   display: flex; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 6px;
   cursor: pointer; font-family: var(--mono); font-size: 12px; transition: background .1s;
 }
 .detail-file:hover { background: var(--hover); }
 .chg-A { color: var(--green); } .chg-M { color: var(--yellow); } .chg-D { color: var(--red); } .chg-R { color: var(--purple); }
+
+/* diff 容器（对比视图等） */
+.diff-box {
+  border: 1px solid var(--border); border-radius: 8px;
+  overflow: auto; max-height: calc(100vh - 220px); user-select: text; background: var(--editor-bg);
+}
 
 /* ================= Git 工作区 ================= */
 .work-wrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }

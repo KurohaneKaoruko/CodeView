@@ -1,6 +1,6 @@
 // Git 工作区：暂存/提交、远程同步、分支、合并/变基/回退、stash、冲突解决
 import { api } from '../api.js';
-import { el, icon, formModal, confirmDlg, toast, errToast, avatar } from '../ui.js';
+import { el, icon, formModal, confirmDlg, toast, errToast, renderDiffRows } from '../ui.js';
 
 const state = {
   status: null,
@@ -215,9 +215,10 @@ export function render(content) {
         if (!patch.trim()) {
           host.append(el('div', { class: 'empty-hint' }, '（无差异，可能是新文件）'));
         } else {
-          const pre = el('pre', {});
-          pre.innerHTML = renderPatch(patch);
-          const box = el('div', { class: 'diff-box', style: { margin: '10px', maxHeight: '60vh' } }, pre);
+          const box = el('div', { class: 'diff-box', style: { margin: '10px', maxHeight: '60vh' } });
+          box.append(renderDiffRows(patch, {
+            onOpenLine: (ln) => window.CodeView.openFileAt(path, ln),
+          }));
           host.append(box);
         }
       } catch (e) {
@@ -227,20 +228,6 @@ export function render(content) {
   }
 
   // ---------------- 杂项 ----------------
-  function renderPatch(patch) {
-    return patch.split('\n').map((line) => {
-      if (/^(\+\+\+|---|diff |index )/.test(line)) return `<div class="dl-meta">${esc(line)}</div>`;
-      if (line.startsWith('@@')) return `<div class="dl-hunk">${esc(line)}</div>`;
-      if (line.startsWith('+')) return `<div class="dl-add">${esc(line)}</div>`;
-      if (line.startsWith('-')) return `<div class="dl-del">${esc(line)}</div>`;
-      return esc(line);
-    }).join('\n');
-  }
-
-  function esc(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
   function opLabel(op) {
     return { merge: '合并 (merge)', rebase: '变基 (rebase)', 'cherry-pick': '拣选 (cherry-pick)', revert: '还原 (revert)' }[op] || op || '冲突解决';
   }

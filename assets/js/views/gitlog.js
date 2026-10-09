@@ -1,6 +1,6 @@
 // Git 历史：全分支提交图谱 + 提交详情 + 上下文操作
 import { api } from '../api.js';
-import { el, icon, contextMenu, formModal, confirmDlg, toast, errToast, fmtTime, shortOid, avatar } from '../ui.js';
+import { el, icon, contextMenu, formModal, confirmDlg, toast, errToast, fmtTime, shortOid, avatar, renderDiffRows } from '../ui.js';
 import { computeLanes, renderGraphSvg } from '../gitlanes.js';
 
 const state = {
@@ -131,6 +131,9 @@ export function render(content) {
         contextMenu(ev.clientX, ev.clientY, [
           { label: '复制 commit id', icon: 'copy', onClick: () => navigator.clipboard.writeText(r.oid).then(() => toast('已复制', 'ok')) },
           '-',
+          { label: '设为对比 A（基准端）', icon: 'compare', onClick: () => window.CodeView.setCompareA(r.oid) },
+          { label: '设为对比 B（目标端）', icon: 'compare', onClick: () => window.CodeView.setCompareB(r.oid) },
+          '-',
           { label: '在此创建分支…', icon: 'branch', onClick: () => branchHere(r) },
           { label: '检出此提交（detached HEAD）', icon: 'play', onClick: () => runOp({ op: 'checkout', target: r.oid }) },
           { label: 'Cherry-pick 此提交', icon: 'cherry', onClick: () => runOp({ op: 'cherry-pick', target: r.oid }) },
@@ -193,7 +196,9 @@ export function render(content) {
             e.currentTarget.style.background = 'var(--active)';
             diffBox.innerHTML = '';
             diffBox.className = 'diff-box';
-            diffBox.append(Object.assign(el('pre', {}), { innerHTML: renderPatch(f.patch) }));
+            diffBox.append(renderDiffRows(f.patch, {
+              onOpenLine: f.change !== 'D' ? (ln) => window.CodeView.openFileAt(f.path, ln) : null,
+            }));
           },
         },
         el('span', { class: `chg-${f.change}` }, f.change),
@@ -208,21 +213,6 @@ export function render(content) {
       detail.append(el('div', { class: 'empty-hint' }, e.message));
     }
   }
-
-  function renderPatch(patch) {
-    if (!patch) return '<div class="empty-hint">（二进制文件或无差异）</div>';
-    return patch.split('\n').map((line) => {
-      if (/^(\+\+\+|---|diff |index )/.test(line)) return `<div class="dl-meta">${esc(line)}</div>`;
-      if (line.startsWith('@@')) return `<div class="dl-hunk">${esc(line)}</div>`;
-      if (line.startsWith('+')) return `<div class="dl-add">${esc(line)}</div>`;
-      if (line.startsWith('-')) return `<div class="dl-del">${esc(line)}</div>`;
-      return esc(line);
-    }).join('');
-  }
-}
-
-function esc(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 async function branchHere(r) {
