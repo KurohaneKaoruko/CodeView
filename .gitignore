@@ -2,6 +2,9 @@
 /target
 **/*.rs.bk
 
+# Tauri 构建产物
+crates/desktop/gen/
+
 # Node / 前端
 node_modules/
 dist/
