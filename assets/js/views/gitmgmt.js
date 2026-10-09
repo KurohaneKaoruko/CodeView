@@ -108,7 +108,6 @@ export function render(content) {
     drawer.classList.add('open');
   }
   function closeDrawer() { drawer.classList.remove('open'); }
-  window.CodeView._closeDrawer = closeDrawer;
 
   // ---------------- 大型视图（横向自由画布） ----------------
   let largeHost = null;

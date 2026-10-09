@@ -43,8 +43,8 @@ const editorWrap = content.querySelector('.editor-wrap');
 editor.onDirtyChange((n) => {
   const el2 = document.getElementById('sb-dirty');
   el2.textContent = n ? `● ${n} 个未保存` : '';
-  const tab = document.querySelector('.act-btn[data-view=files]');
-  let badge = tab.querySelector('.act-badge');
+  const tab = document.querySelector('.act-btn[data-panel=files]');
+  let badge = tab ? tab.querySelector('.act-badge') : null;
   if (n > 0) {
     if (!badge) { badge = el('span', { class: 'act-badge' }); tab.append(badge); }
     badge.textContent = n;
@@ -101,15 +101,17 @@ function switchView(view, force = false) {
   content.querySelectorAll('.view').forEach((v) => v.remove());
   if (view === 'files') {
     setActiveEditor(true);
+    side.classList.remove('collapsed');
     if (force || S.sidePanel !== S.renderedPanel) renderSidebar();
   } else {
+    // 其他视图全宽，不显示侧栏
     setActiveEditor(false);
+    side.classList.add('collapsed');
     const holder = el('div', { class: 'view' });
     content.append(holder);
     if (view === 'git') git.render(holder);
     else if (view === 'compare') compare.render(holder);
     else if (view === 'deps') deps.render(holder);
-    if (!side.children.length) renderSidebar();
   }
   syncActivity();
 }
@@ -117,7 +119,6 @@ function switchView(view, force = false) {
 // ---- 侧栏面板（资源管理器 / 搜索 / AI 分析） ----
 function renderSidebar() {
   side.innerHTML = '';
-  side.classList.add('visible');
   S.renderedPanel = S.sidePanel;
   const host = el('div', { class: 'side-host' });
   side.append(host);
@@ -212,6 +213,22 @@ async function boot() {
     S.overview = await api.overview();
     await boot();
   } catch (e) {
-    content.append(el('div', { class: 'empty-hint' }, `无法连接服务：${e.message}`));
+    fatal(`无法连接服务：${e.message}`);
   }
 })();
+
+// 启动/切换失败：居中浮层提示（不污染内容区布局），重试或关闭后可继续操作
+function fatal(msg) {
+  document.querySelectorAll('.fatal-overlay').forEach((n) => n.remove());
+  const box = el('div', { class: 'fatal-overlay' },
+    el('div', { class: 'fatal-box' },
+      el('div', { class: 'fatal-title' }, '⚠ CodeView 启动失败'),
+      el('div', { class: 'fatal-msg' }, String(msg)),
+      el('div', { class: 'fatal-actions' },
+        el('button', { class: 'btn mini', onclick: () => location.reload() }, '重新加载'),
+        el('button', { class: 'btn mini ghost', onclick: () => box.remove() }, '关闭'),
+      ),
+    ),
+  );
+  document.body.append(box);
+}

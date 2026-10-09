@@ -147,26 +147,13 @@ svg.ic { flex: 0 0 auto; vertical-align: -2px; }
   font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
   position: sticky; top: 0; background: var(--sidebar); z-index: 5;
 }
-/* ---- 侧栏竖向堆叠 section（资源 / 搜索 / AI） ---- */
+/* ---- 侧栏（由活动栏图标切换面板） ---- */
 #side {
   flex: 0 0 290px; border-right: 1px solid var(--border);
   background: var(--sidebar); display: flex; flex-direction: column; overflow: hidden;
 }
 #side.collapsed { display: none; }
 .side-host { flex: 1 1 auto; overflow: auto; min-height: 0; }
-.side-sec { border-bottom: 1px solid var(--border); min-height: 0; display: flex; flex-direction: column; }
-.side-sec:last-child { border-bottom: none; }
-.side-sec-head {
-  display: flex; align-items: center; gap: 6px; flex: 0 0 30px;
-  padding: 0 6px 0 8px; color: var(--fg-dim); cursor: pointer; user-select: none;
-  background: var(--sidebar);
-  font-size: 11px; font-weight: 650; letter-spacing: .8px; text-transform: uppercase;
-}
-.side-sec-head:hover { background: var(--hover); }
-.side-sec-head .caret { display: flex; align-items: center; color: var(--fg-faint); transition: transform .12s; }
-.side-sec-head .caret.open { transform: rotate(90deg); }
-.side-sec-head .t { letter-spacing: .5px; }
-.side-sec-body { overflow: auto; min-height: 0; }
 .side-head .btns { margin-left: auto; display: flex; gap: 2px; }
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
