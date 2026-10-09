@@ -51,7 +51,6 @@ export function render(host, opts = {}) {
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
 
   host.append(
-    el('div', { class: 'side-head' }, icon('search', 13), '搜索'),
     el('div', { style: { padding: '10px' } },
       el('div', { style: { display: 'flex', gap: '6px' } },
         input,

@@ -33,16 +33,17 @@ function statusClass(path) {
   return c ? `st-${c}` : '';
 }
 
-export function render(sideHost) {
-  host = sideHost;
+/** 侧栏 section 头部的操作按钮 */
+export function actions() {
+  return [
+    el('button', { class: 'icon-btn', title: '新建文件', onclick: () => newAt('') }, icon('file', 13)),
+    el('button', { class: 'icon-btn', title: '新建文件夹', onclick: () => newAt('', 'dir') }, icon('folder', 13)),
+    el('button', { class: 'icon-btn', title: '刷新', onclick: () => { refreshGitStatus(); window.CodeView.refreshStatusbar(); } }, icon('refresh', 13)),
+  ];
+}
+
+export function render(host) {
   host.innerHTML = '';
-  host.append(el('div', { class: 'side-head' }, '资源管理器',
-    el('span', { class: 'btns' },
-      el('button', { class: 'icon-btn', title: '新建文件', onclick: () => newAt('') }, icon('file', 14)),
-      el('button', { class: 'icon-btn', title: '新建文件夹', onclick: () => newAt('', 'dir') }, icon('folder', 14)),
-      el('button', { class: 'icon-btn', title: '刷新', onclick: () => { refreshGitStatus(); window.CodeView.refreshStatusbar(); } }, icon('refresh', 14)),
-    ),
-  ));
   const root = el('div', {});
   host.append(root);
   loadChildren('', root, 0);

@@ -95,25 +95,38 @@ function switchView(view, force = false) {
   else if (view === 'deps') deps.render(holder);
 }
 
-// ---- 侧栏：资源 / 搜索 / AI 三个小标签 ----
+// ---- 侧栏：竖向堆叠 —— 资源管理器 / 搜索 / AI 分析（顺序固定，AI 在最后） ----
+const SIDE_SEC = { files: true, search: true, ai: true };
 function renderSidebar() {
   side.innerHTML = '';
-  const tabs = el('div', { class: 'side-tabs' });
-  const host = el('div', { class: 'side-host' });
-  const defs = [
-    { key: 'files', label: '资源', ic: 'code', render: (h) => files.render(h) },
-    { key: 'search', label: '搜索', ic: 'search', render: (h) => searchPanel.render(h, { focus: true }) },
-    { key: 'ai', label: 'AI', ic: 'sparkles', render: (h) => aiPanel.render(h) },
-  ];
-  for (const d of defs) {
-    tabs.append(el('button', {
-      class: `side-tab${S.sideTab === d.key ? ' active' : ''}`,
-      onclick: () => { S.sideTab = d.key; renderSidebar(); },
-    }, icon(d.ic, 13), d.label));
-  }
-  side.append(tabs, host);
-  const cur = defs.find((d) => d.key === S.sideTab) || defs[0];
-  cur.render(host);
+  const section = (key, title, iconName, actions, grow) => {
+    const open = SIDE_SEC[key];
+    const head = el('div', { class: 'side-sec-head' },
+      el('span', { class: `caret${open ? ' open' : ''}` }, icon('chev-right', 10)),
+      icon(iconName, 12),
+      el('span', { class: 't' }, title),
+      el('span', { style: { flex: 1 } }),
+      ...(actions || []),
+    );
+    head.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      SIDE_SEC[key] = !SIDE_SEC[key];
+      renderSidebar();
+    });
+    const body = el('div', {
+      class: 'side-sec-body',
+      style: { display: open ? '' : 'none', flex: grow === true ? '1 1 auto' : `0 0 ${grow}px` },
+    });
+    side.append(el('div', {
+      class: 'side-sec',
+      style: { flex: grow === true ? '1 1 auto' : '0 0 auto', minHeight: grow === true ? '150px' : '0' },
+    }, head, body));
+    return body;
+  };
+
+  files.render(section('files', '资源管理器', 'code', files.actions(), true));
+  searchPanel.render(section('search', '搜索', 'search', [], 200));
+  aiPanel.render(section('ai', 'AI 分析', 'sparkles', [], 240));
 }
 
 // ---- 打开项目 ----
