@@ -7,6 +7,7 @@ import * as files from './views/files.js?v=3';
 import * as editor from './views/editor.js?v=3';
 import * as git from './views/gitmgmt.js?v=3';
 import * as compare from './views/compare.js?v=3';
+import * as charts from './views/charts.js?v=3';
 import * as deps from './views/deps.js?v=3';
 import * as searchPanel from './views/searchpanel.js?v=3';
 import * as ai from './views/ai.js?v=3';
@@ -17,7 +18,7 @@ const side = document.getElementById('side');
 const content = document.getElementById('content');
 
 // 活动栏图标：左列每个图标 = 一个视图 或 一个侧栏面板
-const ACT_ICONS = { files: 'code', search: 'search', ai: 'sparkles', git: 'branch', compare: 'compare', deps: 'package' };
+const ACT_ICONS = { files: 'code', search: 'search', ai: 'sparkles', git: 'branch', compare: 'compare', charts: 'chart', deps: 'package' };
 function syncActivity() {
   document.querySelectorAll('.act-btn').forEach((x) => {
     const onPanel = x.dataset.panel && x.dataset.panel === S.sidePanel && S.view === 'files';
@@ -129,6 +130,7 @@ function commandPalette() {
     { label: '视图：全局搜索', sub: '侧栏', icon: 'search', keywords: 'search grep find', action: () => { S.sidePanel = 'search'; switchView('files', true); } },
     { label: '视图：Git 管理', sub: '提交 / 分支', icon: 'branch', keywords: 'git scm commit', action: go('git') },
     { label: '视图：提交对比', sub: 'A/B 差异', icon: 'compare', keywords: 'diff compare', action: go('compare') },
+    { label: '视图：变更图表', sub: '折线 / K线', icon: 'chart', keywords: 'chart stats 变更 统计 k线 折线', action: go('charts') },
     { label: '视图：依赖图谱', sub: '文件 / 符号依赖', icon: 'package', keywords: 'deps graph import', action: go('deps') },
     { label: '视图：AI 分析', sub: '问答 / 概览', icon: 'sparkles', keywords: 'ai chat llm', action: go('ai') },
     '-',
@@ -274,6 +276,7 @@ function switchView(view, force = false) {
     content.append(holder);
     if (view === 'git') git.render(holder);
     else if (view === 'compare') compare.render(holder);
+    else if (view === 'charts') charts.render(holder);
     else if (view === 'ai') ai.render(holder);
     else if (view === 'deps') deps.render(holder);
   }

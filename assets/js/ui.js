@@ -46,6 +46,8 @@ const ICONS = {
   disc: '<circle cx="12" cy="12" r="9"/>',
   terminal: '<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>',
   graph: '<circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7 7.5 10.5 16"/><path d="m17 7.5-3.5 8.5"/><path d="M7.5 6h9"/>',
+  chart: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m7 15 4-4 3 3 5-6"/>',
+  candle: '<path d="M8 3v4"/><rect x="5.5" y="7" width="5" height="9" rx="1"/><path d="M8 16v4"/><path d="M16 4v3"/><rect x="13.5" y="7" width="5" height="9" rx="1"/><path d="M16 16v4"/>',
   layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
   folderOpen: '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
   dot: '<circle cx="12" cy="12" r="3"/>',
@@ -272,10 +274,15 @@ export function avatar(name, size = 20) {
 // items: [{value, label}] 或 [字符串]；返回 { el, get, set, setItems }
 export function dropdown({ items = [], value = '', placeholder = '请选择…', width = '', onChange } = {}) {
   let list = null;
-  let valSpan = null;
   const wrap = el('div', { class: 'dd', style: width ? { width } : {} });
+  // 按钮显示选中项的 label（无匹配时回退 value / 占位符）
+  const labelOf = (v) => {
+    const it = items.find((x) => (x.value ?? x) === v);
+    return (it && it.label != null ? it.label : null) || v || placeholder;
+  };
+  const valSpan = el('span', { class: 'dd-val' }, labelOf(value));
   const btn = el('button', { type: 'button', class: 'dd-btn' },
-    el('span', { class: 'dd-val' }, value || placeholder),
+    valSpan,
     icon('chev-down', 11),
   );
   const close = () => { if (list) { list.remove(); list = null; } document.removeEventListener('mousedown', out, true); };
@@ -291,7 +298,7 @@ export function dropdown({ items = [], value = '', placeholder = '请选择…',
         class: `dd-item${v === value ? ' sel' : ''}`,
         onclick: () => {
           value = v;
-          valSpan.textContent = value || placeholder;
+          valSpan.textContent = labelOf(value);
           close();
           onChange && onChange(value);
         },
@@ -305,8 +312,8 @@ export function dropdown({ items = [], value = '', placeholder = '请选择…',
   return {
     el: wrap,
     get: () => value,
-    set: (v) => { value = v; valSpan.textContent = v || placeholder; },
-    setItems: (newItems) => { items = newItems; },
+    set: (v) => { value = v; valSpan.textContent = labelOf(value); },
+    setItems: (newItems) => { items = newItems; valSpan.textContent = labelOf(value); },
   };
 }
 

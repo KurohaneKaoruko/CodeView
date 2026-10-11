@@ -35,6 +35,8 @@ export const api = {
   gitFileDiff: (path, staged = false) =>
     fetch(`/api/git/file_diff?path=${encodeURIComponent(path)}&staged=${staged ? 1 : 0}`).then((r) => r.text()),
   gitCommit: (oid) => fetch(`/api/git/commit?oid=${encodeURIComponent(oid)}`).then(handle),
+  gitStats: (limit = 300, ref = '') =>
+    fetch(`/api/git/stats?limit=${limit}&ref=${encodeURIComponent(ref)}`).then(handle),
   gitCompare: (from, to, mb = false) =>
     fetch(`/api/git/compare?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&mb=${mb ? 1 : 0}`).then(handle),
   gitStage: (paths) =>

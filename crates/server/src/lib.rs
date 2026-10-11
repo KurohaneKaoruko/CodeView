@@ -384,6 +384,17 @@ async fn git_refs(State(app): State<std::sync::Arc<App>>) -> Response {
     .await
 }
 
+/// 把用户输入的引用（分支名 / origin/x / refs/…）规范成可解析形态：
+/// 纯名字 → refs/heads/<name>；其余原样保留，由 log/stats 内部经 push_ref 失败后
+/// 走 revparse（会按 refs/heads → refs/remotes 顺序解析，本地分支优先）。
+fn normalize_git_ref(s: &str) -> String {
+    if !s.contains('/') {
+        format!("refs/heads/{s}")
+    } else {
+        s.to_string()
+    }
+}
+
 async fn git_log(
     State(app): State<std::sync::Arc<App>>,
     Query(q): Query<HashMap<String, String>>,
@@ -398,16 +409,30 @@ async fn git_log(
                     .unwrap_or(400)
                     .min(3000);
                 let skip: usize = q.get("skip").and_then(|v| v.parse().ok()).unwrap_or(0);
-                let filter = q.get("ref").filter(|s| !s.is_empty()).map(|s| {
-                    if s.contains('/') && !s.starts_with("refs/") {
-                        format!("refs/remotes/{s}")
-                    } else if !s.contains('/') {
-                        format!("refs/heads/{s}")
-                    } else {
-                        s.clone()
-                    }
-                });
+                let filter = q.get("ref").filter(|s| !s.is_empty()).map(|s| normalize_git_ref(s));
                 gitread::log(&repo, limit, skip, filter.as_deref())
+            })
+        })
+    })
+    .await
+}
+
+async fn git_stats(
+    State(app): State<std::sync::Arc<App>>,
+    Query(q): Query<HashMap<String, String>>,
+) -> Response {
+    blocking(move || {
+        api_result(|| {
+            with_root(&app, |root| {
+                let repo = gitread::open(root)?;
+                // limit：缺省 300；0 = 全部提交；其余上限 2000
+                let limit: usize = match q.get("limit").and_then(|v| v.parse::<usize>().ok()) {
+                    Some(0) => usize::MAX,
+                    Some(n) => n.min(2000),
+                    None => 300,
+                };
+                let filter = q.get("ref").filter(|s| !s.is_empty()).map(|s| normalize_git_ref(s));
+                gitread::stats(&repo, limit, filter.as_deref())
             })
         })
     })
@@ -923,6 +948,7 @@ fn router(app: std::sync::Arc<App>) -> Router {
         .route("/api/git/status", get(git_status))
         .route("/api/git/refs", get(git_refs))
         .route("/api/git/log", get(git_log))
+        .route("/api/git/stats", get(git_stats))
         .route("/api/git/file_diff", get(git_file_diff))
         .route("/api/git/compare", get(git_compare))
         .route("/api/git/stage", post(git_stage))

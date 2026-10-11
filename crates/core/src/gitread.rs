@@ -509,6 +509,159 @@ pub fn commit_detail(repo: &Repository, oid_str_param: &str) -> Result<CommitDet
     })
 }
 
+// ---------------- 提交变更统计（变更图表） ----------------
+
+#[derive(Serialize)]
+pub struct CommitStat {
+    pub oid: String,
+    pub subject: String,
+    pub author: String,
+    pub time: i64,
+    pub parents: usize,
+    pub insertions: u32,
+    pub deletions: u32,
+    pub files_added: u32,
+    pub files_deleted: u32,
+    pub files_modified: u32,
+}
+
+#[derive(Serialize)]
+pub struct StatsResult {
+    pub base_files: u64, // 窗口起点（最旧提交的第一父提交）的文件总数
+    pub base_lines: u64, // 同一时刻的总行数（二进制 / 超大 blob 不计行）
+    pub points: Vec<CommitStat>,
+}
+
+/// 统计一棵树里的文件数与行数（行数跳过二进制与超大 blob）。
+fn tree_totals(repo: &Repository, tree: &git2::Tree) -> (u64, u64) {
+    fn walk(repo: &Repository, tree: &git2::Tree, files: &mut u64, lines: &mut u64) {
+        for e in tree.iter() {
+            match e.kind() {
+                Some(git2::ObjectType::Tree) => {
+                    if let Ok(obj) = e.to_object(repo) {
+                        if let Some(sub) = obj.as_tree() {
+                            walk(repo, sub, files, lines);
+                        }
+                    }
+                }
+                Some(git2::ObjectType::Blob) => {
+                    *files += 1;
+                    if let Ok(obj) = e.to_object(repo) {
+                        if let Ok(blob) = obj.peel_to_blob() {
+                            let c = blob.content();
+                            // 跳过二进制（前 8KB 含 NUL）与超大 blob 的行数
+                            if c.len() <= 512 * 1024 && !c.iter().take(8192).any(|&b| b == 0) {
+                                // 行数口径与 diff 统计一致：以换行结尾不计尾空行，无尾换行补 1，
+                                // 这样 base + 逐提交净变化可精确重建每棵树的总行数
+                                let mut n = c.iter().filter(|&&b| b == b'\n').count() as u64;
+                                if !c.is_empty() && *c.last().unwrap() != b'\n' {
+                                    n += 1;
+                                }
+                                *lines += n;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut files = 0u64;
+    let mut lines = 0u64;
+    walk(repo, tree, &mut files, &mut lines);
+    (files, lines)
+}
+
+/// 逐提交变更统计，按时间从旧到新返回，供变更图表使用。
+/// 语义：沿“第一父链”线性统计（类似 `git log --first-parent`），因此
+/// base_* + 逐提交净变化 = 每个时刻的真实总量，K线/折线展示的是“当前值”。
+pub fn stats(repo: &Repository, limit: usize, filter_ref: Option<&str>) -> Result<StatsResult> {
+    let mut rw = repo.revwalk()?;
+    rw.set_sorting(Sort::TIME)?;
+    rw.simplify_first_parent()?;
+    match filter_ref {
+        Some(r) if !r.is_empty() => {
+            rw.push_ref(r).or_else(|_| rw.push(repo.revparse_single(r)?.id()))?;
+        }
+        // 默认沿 HEAD 的第一父链（跨分支统计会对共享提交重复计数，当前值会失真）
+        _ => {
+            let head = repo.head().context("仓库没有 HEAD（空仓库）")?;
+            rw.push(head.target().context("HEAD 无指向")?)?;
+        }
+    }
+    let mut out = Vec::new();
+    for oid in rw {
+        if out.len() >= limit {
+            break;
+        }
+        let oid = oid?;
+        let commit = match repo.find_commit(oid) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let sig = commit.author();
+        let mut st = CommitStat {
+            oid: oid_str(oid),
+            subject: commit.summary().unwrap_or("").to_string(),
+            author: sig.name().unwrap_or("?").to_string(),
+            time: commit.time().seconds(),
+            parents: commit.parent_count(),
+            insertions: 0,
+            deletions: 0,
+            files_added: 0,
+            files_deleted: 0,
+            files_modified: 0,
+        };
+        // 与第一父提交做树级 diff（根提交对空树）；浅克隆等异常情况跳过统计
+        let diff_res = (|| -> std::result::Result<git2::Diff, git2::Error> {
+            let mut opts = DiffOptions::new();
+            opts.context_lines(0);
+            if commit.parent_count() == 0 {
+                repo.diff_tree_to_tree(None, Some(&commit.tree()?), Some(&mut opts))
+            } else {
+                let ptree = commit.parent(0)?.tree()?;
+                repo.diff_tree_to_tree(Some(&ptree), Some(&commit.tree()?), Some(&mut opts))
+            }
+        })();
+        if let Ok(diff) = diff_res {
+            if let Ok(stats) = diff.stats() {
+                st.insertions = stats.insertions() as u32;
+                st.deletions = stats.deletions() as u32;
+            }
+            let n = diff.deltas().count();
+            for i in 0..n {
+                if let Some(d) = diff.get_delta(i) {
+                    match d.status() {
+                        Delta::Added => st.files_added += 1,
+                        Delta::Deleted => st.files_deleted += 1,
+                        _ => st.files_modified += 1,
+                    }
+                }
+            }
+        }
+        out.push(st);
+    }
+    out.reverse(); // 旧 → 新，方便图表直接按时间轴绘制
+
+    // 基准：最旧提交的第一父提交的树（窗口覆盖全历史时为空仓库，即 0 起点）
+    let (base_files, base_lines) = match out.first() {
+        Some(first) => {
+            let base_tree = (|| -> Option<git2::Tree> {
+                let oid = git2::Oid::from_str(&first.oid).ok()?;
+                let commit = repo.find_commit(oid).ok()?;
+                let parent = commit.parent(0).ok()?;
+                parent.tree().ok()
+            })();
+            match base_tree {
+                Some(t) => tree_totals(repo, &t),
+                None => (0, 0),
+            }
+        }
+        None => (0, 0),
+    };
+    Ok(StatsResult { base_files, base_lines, points: out })
+}
+
 #[derive(Serialize)]
 pub struct CompareResult {
     pub from_oid: String,
