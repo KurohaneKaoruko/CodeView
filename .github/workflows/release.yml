@@ -48,7 +48,14 @@ jobs:
             ext: ''
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      # codeview-core 依赖 git2 → openssl-sys / libgit2-sys，Linux 上需要 OpenSSL 开发头文件
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libssl-dev
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -75,7 +82,7 @@ jobs:
             tar -czf "$NAME.tar.gz" -C dist "$NAME"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cli-${{ matrix.platform }}
           path: |
@@ -99,7 +106,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux system deps (Tauri)
         if: matrix.os == 'ubuntu-22.04'
@@ -132,11 +139,14 @@ jobs:
           args: --target ${{ matrix.target }}
 
   # ---------- CLI 归档上传到同一 Release ----------
+  # 即使某个平台失败，也把已产出的归档挂上去（不因单平台失败而整批丢弃）
   upload-cli:
     needs: [cli]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           path: artifacts
           merge-multiple: true
