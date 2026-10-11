@@ -1,18 +1,28 @@
 name: Release
 
-# 推送 v* 标签或在 Actions 页手动触发
+# 推送 v* 标签或在 Actions 页手动触发（手动触发需填版本标签）
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的版本标签（如 v0.1.0）'
+        required: true
+        default: 'v0.1.0'
 
 permissions:
   contents: write
 
+# 同一版本不并发跑两次；已开始的发布不打断
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
-  APP_VERSION: '0.1.0'
-  # tag 推送时 ref_name 即标签名（如 v0.1.0）；手动触发时回退 v0.1.0
-  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || 'v0.1.0' }}
+  # tag 推送时 ref_name 即标签名（如 v0.1.0）；手动触发时取输入值
+  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
+
 jobs:
   # ---------- CLI（codeview 命令，全平台） ----------
   cli:
@@ -28,7 +38,7 @@ jobs:
             target: aarch64-apple-darwin
             platform: macos-arm64
             ext: ''
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             platform: macos-x64
             ext: ''
@@ -54,7 +64,8 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          NAME="CodeView-${APP_VERSION}-${{ matrix.platform }}"
+          VER="${{ env.RELEASE_TAG }}"; VER="${VER#v}"
+          NAME="CodeView-${VER}-${{ matrix.platform }}"
           mkdir -p "dist/$NAME"
           cp "target/${{ matrix.target }}/release/codeview${{ matrix.ext }}" "dist/$NAME/"
           cp README.md "dist/$NAME/" || true
@@ -80,16 +91,12 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            platform: windows-x64
           - os: macos-latest
             target: aarch64-apple-darwin
-            platform: macos-arm64
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
-            platform: macos-x64
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            platform: linux-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -109,6 +116,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: desktop-${{ matrix.target }}
+          workspaces: crates/desktop
 
       - name: Build & upload desktop bundles
         uses: tauri-apps/tauri-action@v0
@@ -118,7 +126,7 @@ jobs:
           projectPath: crates/desktop
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: 'CodeView ${{ env.RELEASE_TAG }}'
-          releaseBody: 'CodeView 轻量项目代码查看器。各平台安装包与独立可执行文件见下方 Assets。'
+          releaseBody: 'CodeView 轻量项目代码查看器。各平台安装包（Tauri）与独立可执行文件（CLI）见下方 Assets。'
           releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}

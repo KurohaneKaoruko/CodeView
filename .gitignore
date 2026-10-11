@@ -20,3 +20,6 @@ dist/
 # 系统文件
 Thumbs.db
 .DS_Store
+
+# 本地工具数据（记忆/日志）
+.workbuddy-ai/
