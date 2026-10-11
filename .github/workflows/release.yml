@@ -24,8 +24,25 @@ env:
   RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
 
 jobs:
+  # ---------- 幂等清理：同标签重跑时先删除已有 Release，避免资产同名冲突 ----------
+  # 仅删除 Release（含其资产），保留 git 标签；首次发布时无 Release，直接跳过
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ env.RELEASE_TAG }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "删除已存在的 Release: $TAG（保留标签）"
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag=false
+          else
+            echo "无已存在的 Release: $TAG，跳过"
+          fi
+
   # ---------- CLI（codeview 命令，全平台） ----------
   cli:
+    needs: [cleanup]
     strategy:
       fail-fast: false
       matrix:
@@ -92,6 +109,7 @@ jobs:
 
   # ---------- 桌面应用（Tauri 打包：nsis / dmg / appimage / deb） ----------
   desktop:
+    needs: [cleanup]
     strategy:
       fail-fast: false
       matrix:
