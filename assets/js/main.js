@@ -2,6 +2,7 @@
 import { api } from './api.js?v=3';
 import { el, icon, toast, errToast } from './ui.js?v=3';import { initPathDrop } from './pathdrop.js?v=3';
 import { hideGraphTooltip } from './gitgraph.js?v=3';
+import { showPalette, paletteOpen } from './palette.js?v=3';
 import * as files from './views/files.js?v=3';
 import * as editor from './views/editor.js?v=3';
 import * as git from './views/gitmgmt.js?v=3';
@@ -51,6 +52,17 @@ editor.onDirtyChange((n) => {
   } else if (badge) badge.remove();
 });
 
+// 状态栏：光标行列 / 选区
+editor.onCursorChange((pos) => {
+  const sb = document.getElementById('sb-pos');
+  if (!sb) return;
+  if (!pos) { sb.textContent = ''; sb.title = ''; return; }
+  sb.textContent = pos.sel
+    ? `行 ${pos.line}，列 ${pos.col}（已选 ${pos.sel}）`
+    : `行 ${pos.line}，列 ${pos.col}`;
+  sb.title = '光标位置';
+});
+
 function setActiveEditor(active) {
   editorWrap.style.display = active ? '' : 'none';
 }
@@ -73,25 +85,173 @@ window.CodeView = {
   openFileAt: editor.openFileAt,
   setCompareA: (oid) => { window.__cmpPrefill = { a: oid }; switchView('compare'); },
   setCompareB: (oid) => { window.__cmpPrefill = { b: oid }; switchView('compare'); },
+  switchView,
+  quickOpen,
+  commandPalette,
+  openFind: () => editor.openFind(),
+  goToLine: () => editor.goToLine(),
+  toggleMode: () => editor.toggleMode(),
+  reloadActive: () => editor.reloadActive(),
+  closeActive: () => editor.closeActive(),
+  showShortcuts,
   _workRefresh: null,
 };
 
+// ---- 快速打开（Ctrl+P） ----
+let fileIndex = null;
+async function ensureFileIndex() {
+  if (fileIndex) return fileIndex;
+  const r = await api.files();
+  fileIndex = r.files || [];
+  return fileIndex;
+}
+function quickOpen() {
+  ensureFileIndex().then((list) => {
+    if (!list.length) { toast('当前项目没有可打开的文件', 'err'); return; }
+    const items = list.map((p) => {
+      const i = p.lastIndexOf('/');
+      return {
+        label: i >= 0 ? p.slice(i + 1) : p,
+        sub: i >= 0 ? p.slice(0, i) : '',
+        icon: 'file',
+        action: () => window.CodeView.openFile(p),
+      };
+    });
+    showPalette({ placeholder: '输入文件名或路径片段…', items, emptyText: '没有匹配的文件', icon: 'file' });
+  }).catch(errToast);
+}
+
+// ---- 命令面板（Ctrl+Shift+P / F1） ----
+function commandPalette() {
+  const go = (v) => () => switchView(v, true);
+  const items = [
+    { label: '视图：资源管理器', sub: '文件树', icon: 'code', keywords: 'explorer files tree', action: () => { S.sidePanel = 'files'; switchView('files', true); } },
+    { label: '视图：全局搜索', sub: '侧栏', icon: 'search', keywords: 'search grep find', action: () => { S.sidePanel = 'search'; switchView('files', true); } },
+    { label: '视图：Git 管理', sub: '提交 / 分支', icon: 'branch', keywords: 'git scm commit', action: go('git') },
+    { label: '视图：提交对比', sub: 'A/B 差异', icon: 'compare', keywords: 'diff compare', action: go('compare') },
+    { label: '视图：依赖图谱', sub: '文件 / 符号依赖', icon: 'package', keywords: 'deps graph import', action: go('deps') },
+    { label: '视图：AI 分析', sub: '问答 / 概览', icon: 'sparkles', keywords: 'ai chat llm', action: go('ai') },
+    '-',
+    { label: '文件：快速打开', sub: 'Ctrl+P', icon: 'file', keywords: 'quick open go to file', action: quickOpen },
+    { label: '文件：在文件中查找', sub: 'Ctrl+F', icon: 'search', keywords: 'find in file', action: () => { switchView('files'); setTimeout(() => editor.openFind(), 0); } },
+    { label: '文件：跳转到行', sub: 'Ctrl+G', icon: 'layers', keywords: 'go to line', action: () => editor.goToLine() },
+    { label: '文件：切换阅读 / 编辑模式', sub: '编辑', icon: 'edit', keywords: 'toggle edit mode', action: () => { switchView('files'); setTimeout(() => editor.toggleMode(), 0); } },
+    { label: '文件：保存当前文件', sub: 'Ctrl+S', icon: 'save', keywords: 'save write', action: () => { switchView('files'); setTimeout(() => editor.saveActive(), 0); } },
+    { label: '文件：从磁盘重新加载', sub: '丢弃内存修改', icon: 'refresh', keywords: 'reload revert disk', action: () => { switchView('files'); setTimeout(() => editor.reloadActive(), 0); } },
+    { label: '文件：关闭当前标签', sub: '', icon: 'x', keywords: 'close tab', action: () => { switchView('files'); setTimeout(() => editor.closeActive(), 0); } },
+    '-',
+    { label: '项目：打开其他项目…', sub: '路径输入框', icon: 'folderOpen', keywords: 'open project folder', action: () => { const i = document.getElementById('root-input'); if (i) { i.focus(); i.select(); } } },
+    { label: '项目：在系统文件管理器中显示', sub: '', icon: 'folderOpen', keywords: 'reveal explorer finder', action: () => { if (S.overview) fetch(`/api/open_native?path=${encodeURIComponent(S.overview.root)}`).catch(() => {}); } },
+    { label: '项目：刷新 Git 状态', sub: '', icon: 'refresh', keywords: 'refresh git status', action: () => window.CodeView.gitChanged() },
+    '-',
+    { label: '帮助：键盘快捷键', sub: 'Ctrl+/', icon: 'terminal', keywords: 'shortcuts keybindings help', action: showShortcuts },
+  ];
+  showPalette({
+    placeholder: '输入命令…',
+    icon: 'terminal',
+    items,
+    emptyText: '没有匹配的命令',
+    onSelect: (it) => it.action && it.action(),
+  });
+}
+
+// ---- 快捷键帮助 ----
+function showShortcuts() {
+  const rows = [
+    ['Ctrl + P', '快速打开文件'],
+    ['Ctrl + Shift + P / F1', '命令面板'],
+    ['Ctrl + F', '在文件中查找'],
+    ['Enter / Shift + Enter', '查找下一个 / 上一个'],
+    ['Ctrl + G', '跳转到行'],
+    ['Ctrl + S', '保存当前文件'],
+    ['Ctrl + Tab', '切换编辑器标签'],
+    ['Ctrl + W', '关闭当前标签'],
+    ['Ctrl + Shift + F', '全局搜索（侧栏）'],
+    ['Tab / Shift + Tab', '缩进 / 反缩进'],
+    ['Enter', '自动保持缩进'],
+    ['Ctrl + /', '显示本帮助'],
+    ['Esc', '关闭浮层 / 查找条'],
+  ];
+  const box = el('div', { class: 'pal-mask' },
+    el('div', { class: 'pal shortcut-panel' },
+      el('div', { class: 'pal-head' }, icon('terminal', 15), el('span', { class: 'pal-title' }, '键盘快捷键')),
+      el('div', { class: 'shortcut-list' },
+        rows.map(([k, d]) => el('div', { class: 'shortcut-row' },
+          el('span', { class: 'kbd-group' }, k.split(' + ').map((p) => el('kbd', {}, p))),
+          el('span', { class: 'shortcut-desc' }, d),
+        )),
+      ),
+    ),
+  );
+  const close = () => { box.remove(); document.removeEventListener('keydown', onKey, true); };
+  const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); close(); } };
+  box.addEventListener('mousedown', (e) => { if (e.target === box) close(); });
+  document.addEventListener('keydown', onKey, true);
+  document.body.append(box);
+}
+
+const isMod = (e) => e.ctrlKey || e.metaKey;
 document.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+  const k = e.key.toLowerCase();
+  // Ctrl+S 保存
+  if (isMod(e) && !e.shiftKey && k === 's') {
     e.preventDefault();
     if (S.view === 'files') editor.saveActive();
+    return;
+  }
+  // Ctrl+P 快速打开 / Ctrl+Shift+P 命令面板
+  if (isMod(e) && k === 'p') {
+    e.preventDefault();
+    if (paletteOpen()) return;
+    if (e.shiftKey) commandPalette(); else quickOpen();
+    return;
+  }
+  // F1 命令面板
+  if (e.key === 'F1') { e.preventDefault(); if (!paletteOpen()) commandPalette(); return; }
+  // Ctrl+F 在文件中查找（Ctrl+Shift+F 走下面的全局搜索）
+  if (isMod(e) && !e.shiftKey && k === 'f') {
+    e.preventDefault();
+    if (S.view !== 'files') switchView('files', true);
+    editor.openFind();
+    return;
+  }
+  // Ctrl+G 跳转到行
+  if (isMod(e) && !e.shiftKey && k === 'g') {
+    e.preventDefault();
+    if (S.view !== 'files') switchView('files', true);
+    editor.goToLine();
+    return;
+  }
+  // Ctrl+W 关闭当前标签
+  if (isMod(e) && !e.shiftKey && k === 'w') {
+    if (S.view === 'files') { e.preventDefault(); editor.closeActive(); }
+    return;
+  }
+  // Ctrl+/ 快捷键帮助
+  if (isMod(e) && (e.key === '/' || e.key === '?')) {
+    e.preventDefault();
+    showShortcuts();
+    return;
   }
   // Ctrl+Tab 切换编辑器标签
   if (e.ctrlKey && e.key === 'Tab') {
     e.preventDefault();
-    if (S.view === 'files') editor.cycleTab(1);
+    if (S.view === 'files') editor.cycleTab(e.shiftKey ? -1 : 1);
+    return;
   }
   // Ctrl+Shift+F 聚焦侧栏搜索
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+  if (isMod(e) && e.shiftKey && k === 'f') {
     e.preventDefault();
-    const input = document.getElementById('side-search-input');
-    if (input) { input.focus(); input.select(); }
+    S.sidePanel = 'search';
+    if (S.view !== 'files') switchView('files', true); else renderSidebar();
+    setTimeout(() => { const input = document.getElementById('side-search-input'); if (input) { input.focus(); input.select(); } }, 0);
+    return;
   }
+});
+
+// 有未保存修改时，关闭/刷新页面给出提醒
+window.addEventListener('beforeunload', (e) => {
+  if (editor.hasDirty()) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // ---- 视图切换（force：手动点击时即使同视图也重绘） ----
@@ -235,10 +395,11 @@ async function boot() {
   document.getElementById('sb-root').textContent = S.overview.root;
   document.getElementById('sb-root').title = S.overview.root;
   document.getElementById('proj-name').textContent = S.overview.name;
-  document.getElementById('sb-hint').textContent = 'Ctrl+S 保存 · Ctrl+Tab 切换标签';
+  document.getElementById('sb-hint').textContent = 'Ctrl+P 快速打开 · Ctrl+F 查找 · Ctrl+S 保存';
   document.title = `CodeView — ${S.overview.name}`;
   // 项目切换：清空各视图残留状态
   window.__rootStamp = S.overview.root;
+  fileIndex = null;
   editor.clearAll();
   await refreshRefsCache();
   await refreshStatusbar();

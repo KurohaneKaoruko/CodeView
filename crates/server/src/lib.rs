@@ -619,6 +619,35 @@ async fn git_action(
     .await
 }
 
+// ---------------- 文件索引（供快速打开 Ctrl+P） ----------------
+
+/// 列出项目内全部文件（相对路径），gitignore 感知、按路径排序、带上限。
+fn list_files(root: &Path) -> Vec<String> {
+    const LIMIT: usize = 50_000;
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .build();
+    let mut out: Vec<String> = Vec::new();
+    for e in walker.flatten() {
+        if !e.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            continue;
+        }
+        if let Ok(rel) = e.path().strip_prefix(root) {
+            out.push(rel.to_string_lossy().replace('\\', "/"));
+        }
+        if out.len() >= LIMIT {
+            break;
+        }
+    }
+    out.sort();
+    out
+}
+
+async fn api_files(State(app): State<std::sync::Arc<App>>) -> Response {
+    blocking(move || api_result(|| with_root(&app, |root| Ok(json!({ "files": list_files(root) }))))).await
+}
+
 // ---------------- 搜索 API ----------------
 
 async fn api_search(
@@ -903,6 +932,7 @@ fn router(app: std::sync::Arc<App>) -> Router {
         .route("/api/deps/graph", get(deps_graph))
         .route("/api/deps/symbols", get(deps_symbols))
         .route("/api/deps/refs", get(deps_refs))
+        .route("/api/files", get(api_files))
         .route("/api/search", get(api_search))
         .route("/api/ai/config", get(ai_get_config).post(ai_set_config))
         .route("/api/ai/ask", post(ai_ask))

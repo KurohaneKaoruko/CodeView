@@ -52,6 +52,7 @@ export const api = {
 
   search: (q, cs = false, re = false) =>
     fetch(`/api/search?q=${encodeURIComponent(q)}&cs=${cs ? 1 : 0}&re=${re ? 1 : 0}`).then(handle),
+  files: () => fetch('/api/files').then(handle),
 
   pickDir: () => fetch('/api/pick_dir').then(handle),
 
