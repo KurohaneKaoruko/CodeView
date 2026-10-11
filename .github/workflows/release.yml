@@ -67,12 +67,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # codeview-core 依赖 git2 → openssl-sys / libgit2-sys，Linux 上需要 OpenSSL 开发头文件
+      # codeview-core 依赖 git2 → openssl-sys，rfd → ashpd → wayland-sys，
+      # Linux 上分别需要 OpenSSL 与 Wayland 开发头文件（桌面 job 因装 libwebkit2gtk 已间接具备）
       - name: Install Linux system deps
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libssl-dev
+          sudo apt-get install -y build-essential pkg-config libssl-dev libwayland-dev
 
       - uses: dtolnay/rust-toolchain@stable
         with:
